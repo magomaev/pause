@@ -124,16 +124,11 @@ async def reminders_no(callback: CallbackQuery, state: FSMContext):
         reminder_enabled=False
     )
 
-    try:
-        await callback.message.edit_text(
-            texts.ONBOARDING_NO_REMINDERS,
-            reply_markup=keyboards.onboarding_no_reminders()
-        )
-    except TelegramAPIError:
-        await callback.message.answer(
-            texts.ONBOARDING_NO_REMINDERS,
-            reply_markup=keyboards.onboarding_no_reminders()
-        )
+    # Завершённое действие — отправляем новым сообщением
+    await callback.message.answer(
+        texts.ONBOARDING_NO_REMINDERS,
+        reply_markup=keyboards.onboarding_no_reminders()
+    )
 
     await callback.answer()
 
@@ -248,16 +243,11 @@ async def select_time(callback: CallbackQuery, state: FSMContext):
         time_text=time_text_map.get(reminder_time, "")
     )
 
-    try:
-        await callback.message.edit_text(
-            confirm_text,
-            reply_markup=keyboards.onboarding_complete()
-        )
-    except TelegramAPIError:
-        await callback.message.answer(
-            confirm_text,
-            reply_markup=keyboards.onboarding_complete()
-        )
+    # Завершённое действие — отправляем новым сообщением
+    await callback.message.answer(
+        confirm_text,
+        reply_markup=keyboards.onboarding_complete()
+    )
 
     await callback.answer()
 

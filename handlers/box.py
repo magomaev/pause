@@ -302,16 +302,11 @@ async def box_later(callback: CallbackQuery, state: FSMContext):
     """Вернуться позже."""
     await state.clear()
 
-    try:
-        await callback.message.edit_text(
-            texts.BOX_LATER,
-            reply_markup=keyboards.box_after_later()
-        )
-    except TelegramAPIError:
-        await callback.message.answer(
-            texts.BOX_LATER,
-            reply_markup=keyboards.box_after_later()
-        )
+    # Завершённое действие — отправляем новым сообщением
+    await callback.message.answer(
+        texts.BOX_LATER,
+        reply_markup=keyboards.box_after_later()
+    )
 
     await callback.answer()
 
@@ -376,11 +371,9 @@ async def box_user_paid(callback: CallbackQuery, bot: Bot, config: Config):
         else:
             await callback.answer("Заказ не найден")
 
-    try:
-        await callback.message.edit_text(
-            texts.BOX_THANKS.format(month=month_display)
-        )
-    except TelegramAPIError:
-        pass
+    # Завершённое действие — отправляем новым сообщением
+    await callback.message.answer(
+        texts.BOX_THANKS.format(month=month_display)
+    )
 
     await callback.answer()

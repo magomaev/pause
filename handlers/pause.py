@@ -15,25 +15,20 @@ router = Router()
 
 @router.message(Command("pause"))
 async def cmd_pause(message: Message):
-    """Команда /pause — отправить случайную паузу."""
-    pause_text = random.choice(texts.PAUSE_TEXTS)
+    """Команда /pause — отправить случайную паузу (длинную)."""
+    pause_text = random.choice(texts.PAUSE_LONG)
     await message.answer(pause_text, reply_markup=keyboards.pause_menu())
 
 
 @router.callback_query(F.data == "pause_now")
 async def callback_pause_now(callback: CallbackQuery):
-    """Кнопка 'Пауза сейчас'."""
-    pause_text = random.choice(texts.PAUSE_TEXTS)
+    """Кнопка 'Пауза сейчас' — длинный контент для осознанного запроса."""
+    pause_text = random.choice(texts.PAUSE_LONG)
 
-    try:
-        await callback.message.edit_text(
-            pause_text,
-            reply_markup=keyboards.pause_menu()
-        )
-    except TelegramAPIError:
-        await callback.message.answer(
-            pause_text,
-            reply_markup=keyboards.pause_menu()
-        )
+    # Паузы — это завершённые действия, отправляем новым сообщением
+    await callback.message.answer(
+        pause_text,
+        reply_markup=keyboards.pause_menu()
+    )
 
     await callback.answer()

@@ -217,11 +217,9 @@ async def user_paid(callback: CallbackQuery, bot: Bot, config: Config):
         else:
             await callback.answer("Заказ не найден")
 
-    try:
-        await callback.message.edit_text(
-            texts.ORDER_THANKS.format(email=order_email)
-        )
-    except TelegramAPIError:
-        pass
+    # Завершённое действие — отправляем новым сообщением
+    await callback.message.answer(
+        texts.ORDER_THANKS.format(email=order_email)
+    )
 
     await callback.answer()
