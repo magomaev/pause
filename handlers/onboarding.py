@@ -25,8 +25,8 @@ class OnboardingForm(StatesGroup):
     time = State()             # Выбор времени
 
 
-async def get_or_create_user(telegram_id: int, username: str | None, first_name: str | None) -> User:
-    """Получить или создать пользователя."""
+async def get_or_create_user(telegram_id: int, username: str | None, first_name: str | None) -> tuple[User, bool]:
+    """Получить или создать пользователя. Возвращает (user, onboarding_completed)."""
     async with get_session() as session:
         result = await session.execute(
             select(User).where(User.telegram_id == telegram_id)
@@ -43,7 +43,9 @@ async def get_or_create_user(telegram_id: int, username: str | None, first_name:
             await session.commit()
             await session.refresh(user)
 
-        return user
+        # Сохраняем значение до закрытия сессии
+        onboarding_completed = user.onboarding_completed
+        return user, onboarding_completed
 
 
 async def update_user_settings(
@@ -76,13 +78,22 @@ async def cmd_start(message: Message, state: FSMContext):
     # Очищаем предыдущее состояние FSM
     await state.clear()
 
-    # Создаём пользователя если нет
-    await get_or_create_user(
+    # Получаем или создаём пользователя
+    user, onboarding_completed = await get_or_create_user(
         message.from_user.id,
         message.from_user.username,
         message.from_user.first_name
     )
 
+    # Если онбординг пройден — показываем меню с паузой
+    if onboarding_completed:
+        await message.answer(
+            texts.WELCOME_BACK,
+            reply_markup=keyboards.onboarding_complete()
+        )
+        return
+
+    # Иначе — начинаем онбординг
     await message.answer(
         texts.ONBOARDING_WELCOME,
         reply_markup=keyboards.onboarding_welcome()
@@ -123,6 +134,12 @@ async def reminders_no(callback: CallbackQuery, state: FSMContext):
         onboarding_completed=True,
         reminder_enabled=False
     )
+
+    # Убираем кнопки с предыдущего сообщения
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except TelegramAPIError:
+        pass
 
     # Завершённое действие — отправляем новым сообщением
     await callback.message.answer(
@@ -242,6 +259,12 @@ async def select_time(callback: CallbackQuery, state: FSMContext):
         frequency_text=freq_text_map.get(frequency, ""),
         time_text=time_text_map.get(reminder_time, "")
     )
+
+    # Убираем кнопки с предыдущего сообщения
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except TelegramAPIError:
+        pass
 
     # Завершённое действие — отправляем новым сообщением
     await callback.message.answer(

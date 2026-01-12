@@ -86,6 +86,9 @@ def pause_menu() -> InlineKeyboardMarkup:
     """Меню после паузы."""
     builder = InlineKeyboardBuilder()
     builder.row(
+        InlineKeyboardButton(text=texts.BTN_PAUSE_NOW, callback_data="pause_now")
+    )
+    builder.row(
         InlineKeyboardButton(text=texts.BTN_GET_BOX, callback_data="get_box")
     )
     return builder.as_markup()
