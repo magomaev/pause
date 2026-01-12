@@ -124,7 +124,7 @@ class PauseScheduler:
 
     async def _send_pause(self, telegram_id: int) -> bool:
         """Отправить паузу пользователю."""
-        pause_text = random.choice(texts.PAUSE_TEXTS)
+        pause_text = random.choice(texts.PAUSE_SHORT)
 
         try:
             await self.bot.send_message(
