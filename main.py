@@ -12,6 +12,7 @@ from handlers import (
     box_router,
     orders_router,
     admin_router,
+    menu_router,
 )
 from scheduler import create_scheduler
 
@@ -42,12 +43,13 @@ async def main():
     # Передаём config во все хэндлеры
     dp["config"] = config
 
-    # Регистрируем роутеры (порядок важен — onboarding первым)
+    # Регистрируем роутеры (порядок важен — onboarding первым, menu последним)
     dp.include_router(onboarding_router)
     dp.include_router(pause_router)
     dp.include_router(box_router)
     dp.include_router(orders_router)
     dp.include_router(admin_router)
+    dp.include_router(menu_router)
 
     # Создаём и запускаем планировщик напоминаний
     pause_scheduler = create_scheduler(bot)

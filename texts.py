@@ -246,3 +246,31 @@ BTN_CONFIRM = "Да, всё верно"
 BTN_CANCEL = "Отмена"
 BTN_PAY = "Оплатить 79 €"
 BTN_PAID = "Я оплатил"
+
+
+# ===== ГЛАВНОЕ МЕНЮ (Reply Keyboard) =====
+
+BTN_MENU_PAUSE = "Пауза"
+BTN_MENU_BREATHE = "Подышать"
+BTN_MENU_MOVIE = "Кино"
+BTN_MENU_BOOK = "Книга"
+BTN_MENU_NEW_BOX = "Новый набор"
+BTN_MENU_SETTINGS = "Настроить паузу"
+
+
+# ===== КОНТЕНТ ДЛЯ МЕНЮ =====
+
+# Медитации (ссылки)
+BREATHE_CONTENT = [
+    "https://soundcloud.com/aleksandra-ermolenko/pauza-dekabr?in=aleksandra-ermolenko%2Fsets%2Fpauza&si=a3094c0bc9f84f0fbad941be6fbdd883&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing",
+]
+
+# Фильмы (ссылки)
+MOVIES = [
+    "https://www.imdb.com/title/tt5247022",
+]
+
+# Книги (ссылки)
+BOOKS = [
+    "https://www.dropbox.com/scl/fi/fv7ihjw2i65372v2sbft8/.epub?rlkey=4edhsw200b4fk064lin7wkwly&st=xsqaokbv&dl=0",
+]

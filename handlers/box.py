@@ -160,7 +160,10 @@ async def box_start(callback: CallbackQuery, state: FSMContext):
     try:
         await callback.message.edit_text(texts.BOX_ASK_NAME)
     except TelegramAPIError:
-        await callback.message.answer(texts.BOX_ASK_NAME)
+        pass
+
+    # Скрываем reply keyboard на время ввода данных
+    await callback.message.answer(texts.BOX_ASK_NAME, reply_markup=keyboards.remove_reply_keyboard())
 
     await callback.answer()
 
@@ -302,10 +305,10 @@ async def box_later(callback: CallbackQuery, state: FSMContext):
     """Вернуться позже."""
     await state.clear()
 
-    # Завершённое действие — отправляем новым сообщением
+    # Завершённое действие — отправляем новым сообщением, возвращаем меню
     await callback.message.answer(
         texts.BOX_LATER,
-        reply_markup=keyboards.box_after_later()
+        reply_markup=keyboards.main_reply_keyboard()
     )
 
     await callback.answer()
@@ -371,9 +374,10 @@ async def box_user_paid(callback: CallbackQuery, bot: Bot, config: Config):
         else:
             await callback.answer("Заказ не найден")
 
-    # Завершённое действие — отправляем новым сообщением
+    # Завершённое действие — отправляем новым сообщением, возвращаем меню
     await callback.message.answer(
-        texts.BOX_THANKS.format(month=month_display)
+        texts.BOX_THANKS.format(month=month_display),
+        reply_markup=keyboards.main_reply_keyboard()
     )
 
     await callback.answer()

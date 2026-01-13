@@ -66,7 +66,10 @@ async def start_order(callback: CallbackQuery, state: FSMContext):
     try:
         await callback.message.edit_text(texts.ORDER_START)
     except TelegramAPIError:
-        await callback.message.answer(texts.ORDER_START)
+        pass
+
+    # Скрываем reply keyboard на время ввода данных
+    await callback.message.answer(texts.ORDER_START, reply_markup=keyboards.remove_reply_keyboard())
 
     await callback.answer()
 
@@ -174,7 +177,10 @@ async def cancel_order(callback: CallbackQuery, state: FSMContext):
     try:
         await callback.message.edit_text(texts.WELCOME, reply_markup=keyboards.main_menu())
     except TelegramAPIError:
-        await callback.message.answer(texts.WELCOME, reply_markup=keyboards.main_menu())
+        pass
+
+    # Возвращаем reply keyboard
+    await callback.message.answer(texts.WELCOME, reply_markup=keyboards.main_reply_keyboard())
 
     await callback.answer()
 
@@ -217,9 +223,10 @@ async def user_paid(callback: CallbackQuery, bot: Bot, config: Config):
         else:
             await callback.answer("Заказ не найден")
 
-    # Завершённое действие — отправляем новым сообщением
+    # Завершённое действие — отправляем новым сообщением, возвращаем меню
     await callback.message.answer(
-        texts.ORDER_THANKS.format(email=order_email)
+        texts.ORDER_THANKS.format(email=order_email),
+        reply_markup=keyboards.main_reply_keyboard()
     )
 
     await callback.answer()

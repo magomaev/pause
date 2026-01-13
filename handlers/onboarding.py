@@ -85,11 +85,11 @@ async def cmd_start(message: Message, state: FSMContext):
         message.from_user.first_name
     )
 
-    # Если онбординг пройден — показываем меню с паузой
+    # Если онбординг пройден — показываем reply keyboard
     if onboarding_completed:
         await message.answer(
             texts.WELCOME_BACK,
-            reply_markup=keyboards.onboarding_complete()
+            reply_markup=keyboards.main_reply_keyboard()
         )
         return
 
@@ -141,10 +141,10 @@ async def reminders_no(callback: CallbackQuery, state: FSMContext):
     except TelegramAPIError:
         pass
 
-    # Завершённое действие — отправляем новым сообщением
+    # Завершённое действие — отправляем новым сообщением с reply keyboard
     await callback.message.answer(
         texts.ONBOARDING_NO_REMINDERS,
-        reply_markup=keyboards.onboarding_no_reminders()
+        reply_markup=keyboards.main_reply_keyboard()
     )
 
     await callback.answer()
@@ -266,10 +266,10 @@ async def select_time(callback: CallbackQuery, state: FSMContext):
     except TelegramAPIError:
         pass
 
-    # Завершённое действие — отправляем новым сообщением
+    # Завершённое действие — отправляем новым сообщением с reply keyboard
     await callback.message.answer(
         confirm_text,
-        reply_markup=keyboards.onboarding_complete()
+        reply_markup=keyboards.main_reply_keyboard()
     )
 
     await callback.answer()

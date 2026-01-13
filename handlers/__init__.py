@@ -3,6 +3,7 @@ from handlers.pause import router as pause_router
 from handlers.box import router as box_router
 from handlers.orders import router as orders_router
 from handlers.admin import router as admin_router
+from handlers.menu import router as menu_router
 
 __all__ = [
     "onboarding_router",
@@ -10,4 +11,5 @@ __all__ = [
     "box_router",
     "orders_router",
     "admin_router",
+    "menu_router",
 ]

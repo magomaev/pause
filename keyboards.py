@@ -1,5 +1,5 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 import texts
 
 
@@ -218,3 +218,28 @@ def admin_box_order_menu(order_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="✗ Отклонить", callback_data=f"box_reject_{order_id}")
     )
     return builder.as_markup()
+
+
+# ===== ГЛАВНОЕ МЕНЮ (Reply Keyboard) =====
+
+def main_reply_keyboard() -> ReplyKeyboardMarkup:
+    """Постоянное меню действий возле поля ввода."""
+    builder = ReplyKeyboardBuilder()
+    builder.row(
+        KeyboardButton(text=texts.BTN_MENU_PAUSE),
+        KeyboardButton(text=texts.BTN_MENU_BREATHE)
+    )
+    builder.row(
+        KeyboardButton(text=texts.BTN_MENU_MOVIE),
+        KeyboardButton(text=texts.BTN_MENU_BOOK)
+    )
+    builder.row(
+        KeyboardButton(text=texts.BTN_MENU_NEW_BOX),
+        KeyboardButton(text=texts.BTN_MENU_SETTINGS)
+    )
+    return builder.as_markup(resize_keyboard=True)
+
+
+def remove_reply_keyboard() -> ReplyKeyboardRemove:
+    """Убрать reply keyboard."""
+    return ReplyKeyboardRemove()
