@@ -3,6 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+from aiogram.types import BotCommand
 
 from config import load_config
 from database import init_db, close_db
@@ -50,6 +51,16 @@ async def main():
     dp.include_router(orders_router)
     dp.include_router(admin_router)
     dp.include_router(menu_router)
+
+    # Устанавливаем команды бота (кнопка Menu)
+    await bot.set_my_commands([
+        BotCommand(command="pause", description="Пауза"),
+        BotCommand(command="breathe", description="Подышать"),
+        BotCommand(command="movie", description="Кино"),
+        BotCommand(command="book", description="Книга"),
+        BotCommand(command="box", description="Новый набор"),
+        BotCommand(command="settings", description="Настроить паузу"),
+    ])
 
     # Создаём и запускаем планировщик напоминаний
     pause_scheduler = create_scheduler(bot)

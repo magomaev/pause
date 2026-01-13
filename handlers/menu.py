@@ -1,15 +1,57 @@
 """
-Обработчики главного меню (Reply Keyboard).
+Обработчики главного меню (команды и Reply Keyboard).
 """
 import random
 from aiogram import Router, F
 from aiogram.types import Message
-from aiogram.filters import StateFilter
+from aiogram.filters import StateFilter, Command
 
 import texts
 import keyboards
 
 router = Router()
+
+
+# ===== КОМАНДЫ (кнопка Menu) =====
+
+@router.message(Command("pause"))
+async def cmd_pause(message: Message):
+    """Команда /pause — случайный текст из длинных пауз."""
+    pause_text = random.choice(texts.PAUSE_LONG)
+    await message.answer(pause_text)
+
+
+@router.message(Command("breathe"))
+async def cmd_breathe(message: Message):
+    """Команда /breathe — ссылка на медитацию."""
+    breathe_url = random.choice(texts.BREATHE_CONTENT)
+    await message.answer(breathe_url)
+
+
+@router.message(Command("movie"))
+async def cmd_movie(message: Message):
+    """Команда /movie — ссылка на фильм."""
+    movie_url = random.choice(texts.MOVIES)
+    await message.answer(movie_url)
+
+
+@router.message(Command("book"))
+async def cmd_book(message: Message):
+    """Команда /book — ссылка на книгу."""
+    book_url = random.choice(texts.BOOKS)
+    await message.answer(book_url)
+
+
+@router.message(Command("settings"))
+async def cmd_settings(message: Message):
+    """Команда /settings — настройка напоминаний."""
+    await message.answer(
+        texts.ONBOARDING_ASK_REMINDERS,
+        reply_markup=keyboards.onboarding_reminders()
+    )
+
+
+# ===== REPLY KEYBOARD =====
 
 
 @router.message(F.text == texts.BTN_MENU_PAUSE, StateFilter(None))
