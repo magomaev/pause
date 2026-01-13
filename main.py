@@ -44,13 +44,13 @@ async def main():
     # Передаём config во все хэндлеры
     dp["config"] = config
 
-    # Регистрируем роутеры (порядок важен — onboarding первым, menu последним)
+    # Регистрируем роутеры (порядок важен — menu первым для команд)
+    dp.include_router(menu_router)
     dp.include_router(onboarding_router)
     dp.include_router(pause_router)
     dp.include_router(box_router)
     dp.include_router(orders_router)
     dp.include_router(admin_router)
-    dp.include_router(menu_router)
 
     # Устанавливаем команды бота (кнопка Menu)
     await bot.set_my_commands([

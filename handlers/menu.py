@@ -14,13 +14,6 @@ router = Router()
 
 # ===== КОМАНДЫ (кнопка Menu) =====
 
-@router.message(Command("pause"))
-async def cmd_pause(message: Message):
-    """Команда /pause — случайный текст из длинных пауз."""
-    pause_text = random.choice(texts.PAUSE_LONG)
-    await message.answer(pause_text)
-
-
 @router.message(Command("breathe"))
 async def cmd_breathe(message: Message):
     """Команда /breathe — ссылка на медитацию."""
