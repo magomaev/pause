@@ -28,7 +28,7 @@ def load_config() -> Config:
         bot_token=os.getenv("BOT_TOKEN", ""),
         admin_id=int(os.getenv("ADMIN_ID", "0")),
         database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///bot.db"),
-        payment_link=os.getenv("PAYMENT_LINK", ""),
+        payment_link=os.getenv("PAYMENT_LINK", "https://checkout.revolut.com/pay/2406b670-be55-4a88-a3ac-9605998a942d"),
         notion_token=os.getenv("NOTION_TOKEN", ""),
         notion_content_db=os.getenv("NOTION_CONTENT_DB", ""),
         notion_ui_texts_db=os.getenv("NOTION_UI_TEXTS_DB", ""),

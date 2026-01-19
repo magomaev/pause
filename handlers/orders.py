@@ -1,4 +1,3 @@
-import re
 import logging
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
@@ -24,8 +23,8 @@ MENU_BUTTONS = {
     texts.BTN_MENU_REMINDERS,
 }
 
-# Regex для валидации телефона (международный формат)
-PHONE_REGEX = re.compile(r'^\+?[\d\s\-\(\)]{7,20}$')
+# Минимальная длина контакта
+MIN_CONTACT_LENGTH = 3
 
 # Ограничения
 MAX_NAME_LENGTH = 100
@@ -35,7 +34,7 @@ MIN_ADDRESS_LENGTH = 10
 
 class OrderForm(StatesGroup):
     name = State()
-    phone = State()
+    contact = State()
     address = State()
     confirm = State()
 
@@ -55,14 +54,13 @@ def validate_name(name: str) -> tuple[bool, str]:
     return True, ""
 
 
-def validate_phone(phone: str) -> tuple[bool, str]:
-    """Валидация телефона. Возвращает (valid, error_message)."""
-    if not phone or not phone.strip():
-        return False, "Телефон не может быть пустым. Попробуй ещё раз."
+def validate_contact(contact: str) -> tuple[bool, str]:
+    """Валидация контакта. Возвращает (valid, error_message)."""
+    if not contact or not contact.strip():
+        return False, "Контакт не может быть пустым. Попробуй ещё раз."
 
-    phone = phone.strip()
-    if not PHONE_REGEX.match(phone):
-        return False, "Похоже, это не телефон. Укажи номер в международном формате, например: +7 999 123 45 67"
+    if len(contact.strip()) < MIN_CONTACT_LENGTH:
+        return False, "Контакт слишком короткий."
 
     return True, ""
 
@@ -106,20 +104,26 @@ async def process_name(message: Message, state: FSMContext):
 
     name = message.text.strip()
     await state.update_data(name=name)
-    await state.set_state(OrderForm.phone)
-    await message.answer(texts.ORDER_PHONE)
+    await state.set_state(OrderForm.contact)
+
+    # Предлагаем использовать текущий Telegram username если есть
+    username = message.from_user.username
+    if username:
+        await message.answer(texts.ORDER_CONTACT_WITH_USERNAME.format(username=username))
+    else:
+        await message.answer(texts.ORDER_CONTACT)
 
 
-@router.message(OrderForm.phone, ~F.text.in_(MENU_BUTTONS))
-async def process_phone(message: Message, state: FSMContext):
-    """Обработка телефона пользователя."""
-    valid, error = validate_phone(message.text)
+@router.message(OrderForm.contact, ~F.text.in_(MENU_BUTTONS))
+async def process_contact(message: Message, state: FSMContext):
+    """Обработка контакта пользователя."""
+    valid, error = validate_contact(message.text)
     if not valid:
         await message.answer(error)
         return
 
-    phone = message.text.strip()
-    await state.update_data(phone=phone)
+    contact = message.text.strip()
+    await state.update_data(contact=contact)
     await state.set_state(OrderForm.address)
     await message.answer(texts.ORDER_ADDRESS)
 
@@ -138,7 +142,7 @@ async def process_address(message: Message, state: FSMContext):
 
     await state.set_state(OrderForm.confirm)
     await message.answer(
-        texts.ORDER_CONFIRM.format(name=data["name"], phone=data["phone"], address=address),
+        texts.ORDER_CONFIRM.format(name=data["name"], contact=data["contact"], address=address),
         reply_markup=keyboards.confirm_order()
     )
 
@@ -150,7 +154,7 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext, config: Conf
     data = await state.get_data()
 
     # Проверяем что данные есть
-    if not data or "name" not in data or "phone" not in data or "address" not in data:
+    if not data or "name" not in data or "contact" not in data or "address" not in data:
         await callback.answer("Сессия истекла. Начни заново с /start")
         await state.clear()
         return
@@ -163,7 +167,7 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext, config: Conf
         order = Order(
             telegram_id=callback.from_user.id,
             name=data["name"],
-            phone=data["phone"],
+            phone=data["contact"],  # поле в БД называется phone
             address=data["address"],
             amount=config.product_price,
             currency=config.product_currency,
@@ -190,7 +194,7 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext, config: Conf
     admin_text = f"""Новый заказ #{order_id}
 
 Имя: {data["name"]}
-Телефон: {data["phone"]}
+Контакт: {data["contact"]}
 Адрес: {data["address"]}
 Сумма: {config.product_price} {config.product_currency}
 Telegram: @{callback.from_user.username or "—"}"""
@@ -226,7 +230,7 @@ async def cancel_order(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "i_paid")
 async def user_paid(callback: CallbackQuery, bot: Bot, config: Config):
     """Пользователь отметил оплату."""
-    order_phone = "указанный номер"
+    order_contact = None
 
     async with get_session() as session:
         result = await session.execute(
@@ -246,7 +250,7 @@ async def user_paid(callback: CallbackQuery, bot: Bot, config: Config):
             order.status = OrderStatus.PAID
             order.paid_at = datetime.now(timezone.utc)
             await session.commit()
-            order_phone = order.phone or order_phone
+            order_contact = order.phone
             order_id = order.id
 
             # Уведомляем админа (с обработкой ошибок)
@@ -263,7 +267,7 @@ async def user_paid(callback: CallbackQuery, bot: Bot, config: Config):
 
     # Завершённое действие — отправляем новым сообщением, возвращаем меню
     await callback.message.answer(
-        texts.ORDER_THANKS.format(phone=order_phone),
+        texts.ORDER_THANKS,
         reply_markup=keyboards.main_reply_keyboard()
     )
 
