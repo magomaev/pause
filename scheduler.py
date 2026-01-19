@@ -10,9 +10,9 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from sqlalchemy import select
 
-import texts
 import keyboards
 from database import get_session, User, ReminderFrequency, ReminderTime
+from content import ContentManager
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,8 @@ class PauseScheduler:
 
     async def _send_pause(self, telegram_id: int) -> bool:
         """Отправить паузу пользователю."""
-        pause_text = random.choice(texts.PAUSE_SHORT)
+        content = ContentManager.get_instance()
+        pause_text = await content.get_random_pause_short()
 
         try:
             await self.bot.send_message(

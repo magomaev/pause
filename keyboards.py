@@ -224,15 +224,11 @@ def main_reply_keyboard() -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     builder.row(
         KeyboardButton(text=texts.BTN_MENU_PAUSE),
-        KeyboardButton(text=texts.BTN_MENU_BREATHE)
-    )
-    builder.row(
-        KeyboardButton(text=texts.BTN_MENU_MOVIE),
-        KeyboardButton(text=texts.BTN_MENU_BOOK)
+        KeyboardButton(text=texts.BTN_MENU_LONG_PAUSE)
     )
     builder.row(
         KeyboardButton(text=texts.BTN_MENU_NEW_BOX),
-        KeyboardButton(text=texts.BTN_MENU_SETTINGS)
+        KeyboardButton(text=texts.BTN_MENU_REMINDERS)
     )
     return builder.as_markup(resize_keyboard=True)
 

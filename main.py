@@ -16,6 +16,7 @@ from handlers import (
     menu_router,
 )
 from scheduler import create_scheduler
+from content import ContentManager
 
 
 async def main():
@@ -33,6 +34,14 @@ async def main():
 
     # Инициализируем базу данных
     await init_db(config.database_url)
+
+    # Загружаем кэш контента из SQLite
+    content_manager = ContentManager.get_instance()
+    try:
+        await content_manager.reload()
+        logging.info("Кэш контента загружен")
+    except Exception as e:
+        logging.warning(f"Не удалось загрузить кэш контента: {e}, используется fallback")
 
     # Создаём бота и диспетчер
     bot = Bot(

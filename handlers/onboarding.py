@@ -96,7 +96,7 @@ async def cmd_start(message: Message, state: FSMContext):
     # Иначе — начинаем онбординг
     await message.answer(
         texts.ONBOARDING_WELCOME,
-        reply_markup=keyboards.onboarding_welcome()
+        reply_markup=keyboards.main_reply_keyboard()
     )
 
 
