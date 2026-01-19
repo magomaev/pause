@@ -98,9 +98,10 @@ class BoxOrder(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
-    name: Mapped[str] = mapped_column(String(255))
-    email: Mapped[str] = mapped_column(String(255))
-    address: Mapped[str] = mapped_column(Text)  # Полный адрес доставки
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)  # Полный адрес доставки
     box_month: Mapped[str] = mapped_column(String(7))  # Формат "2026-02"
     amount: Mapped[int] = mapped_column(default=79)
     currency: Mapped[str] = mapped_column(String(3), default="EUR")
@@ -124,3 +125,28 @@ class Reminder(Base):
     sent: Mapped[bool] = mapped_column(Boolean, default=False)
     target: Mapped[str] = mapped_column(String(50), default="all")  # all, paid, telegram_id
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+# ===== КЭШИРОВАНИЕ КОНТЕНТА ИЗ NOTION =====
+
+class ContentCache(Base):
+    """Кэш контента из Notion (паузы, ссылки)."""
+    __tablename__ = "content_cache"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(50), index=True)  # pause_short, pause_long, breathe, movie, book
+    content: Mapped[str] = mapped_column(Text)
+    notion_page_id: Mapped[str] = mapped_column(String(50), unique=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class UITextCache(Base):
+    """Кэш UI текстов из Notion."""
+    __tablename__ = "ui_text_cache"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(100), unique=True, index=True)  # ONBOARDING_WELCOME, etc.
+    text: Mapped[str] = mapped_column(Text)
+    notion_page_id: Mapped[str] = mapped_column(String(50))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

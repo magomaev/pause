@@ -9,6 +9,8 @@ from database.models import (
     Reminder,
     ReminderFrequency,
     ReminderTime,
+    ContentCache,
+    UITextCache,
 )
 
 __all__ = [
@@ -24,4 +26,6 @@ __all__ = [
     "Reminder",
     "ReminderFrequency",
     "ReminderTime",
+    "ContentCache",
+    "UITextCache",
 ]

@@ -1,5 +1,13 @@
 """
 Предзаказ физического набора «Пауза».
+
+Новый флоу:
+1. "Откликается" → Заказ создаётся в БД (PENDING)
+2. Имя из Telegram → подтвердить или изменить
+3. Телефон для связи
+4. Адрес доставки
+5. Подтверждение данных
+6. Ссылка на оплату
 """
 import re
 import logging
@@ -20,22 +28,22 @@ from database import get_session, BoxOrder, BoxOrderStatus
 router = Router()
 logger = logging.getLogger(__name__)
 
-# Regex для валидации email
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-
 # Ограничения
 MAX_NAME_LENGTH = 100
 MIN_NAME_LENGTH = 2
 MAX_ADDRESS_LENGTH = 500
 MIN_ADDRESS_LENGTH = 20
 
+# Regex для валидации телефона
+PHONE_REGEX = re.compile(r'^\+?[0-9\s\-\(\)]{7,20}$')
+
 
 class BoxOrderForm(StatesGroup):
     """FSM для предзаказа набора."""
-    name = State()
-    email = State()
-    address = State()
-    confirm = State()
+    name = State()      # Подтверждение/изменение имени
+    phone = State()     # Ввод телефона
+    address = State()   # Ввод адреса
+    confirm = State()   # Подтверждение данных
 
 
 def get_box_month() -> tuple[str, str]:
@@ -87,14 +95,14 @@ def validate_name(name: str) -> tuple[bool, str]:
     return True, ""
 
 
-def validate_email(email: str) -> tuple[bool, str]:
-    """Валидация email. Возвращает (valid, error_message)."""
-    if not email or not email.strip():
-        return False, "Email не может быть пустым. Попробуй ещё раз."
+def validate_phone(phone: str) -> tuple[bool, str]:
+    """Валидация телефона. Возвращает (valid, error_message)."""
+    if not phone or not phone.strip():
+        return False, "Телефон не может быть пустым. Попробуй ещё раз."
 
-    email = email.strip().lower()
-    if not EMAIL_REGEX.match(email):
-        return False, "Похоже, это не email. Попробуй ещё раз."
+    phone = phone.strip()
+    if not PHONE_REGEX.match(phone):
+        return False, "Укажи корректный номер телефона."
 
     return True, ""
 
@@ -106,7 +114,7 @@ def validate_address(address: str) -> tuple[bool, str]:
 
     address = address.strip()
     if len(address) < MIN_ADDRESS_LENGTH:
-        return False, f"Адрес слишком короткий. Укажи полный адрес с индексом."
+        return False, "Адрес слишком короткий. Укажи полный адрес с индексом."
 
     if len(address) > MAX_ADDRESS_LENGTH:
         return False, f"Адрес слишком длинный. Максимум {MAX_ADDRESS_LENGTH} символов."
@@ -150,29 +158,72 @@ async def callback_get_box(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# ===== ОТКЛИКАЕТСЯ → ВВОД ИМЕНИ =====
+# ===== ОТКЛИКАЕТСЯ → СОЗДАНИЕ ЗАКАЗА + ЗАПРОС ИМЕНИ =====
 
 @router.callback_query(F.data == "box_start")
-async def box_start(callback: CallbackQuery, state: FSMContext):
-    """Пользователю откликается — начинаем сбор данных."""
+async def box_start(callback: CallbackQuery, state: FSMContext, config: Config):
+    """
+    Пользователю откликается — создаём заказ в БД сразу.
+    Показываем имя из Telegram для подтверждения.
+    """
+    month_key, month_display = get_box_month()
+
+    # Создаём заказ в БД сразу (без phone/address — заполним позже)
+    async with get_session() as session:
+        order = BoxOrder(
+            telegram_id=callback.from_user.id,
+            box_month=month_key,
+            amount=config.product_price,
+            currency=config.product_currency,
+            status=BoxOrderStatus.PENDING
+        )
+        session.add(order)
+        await session.commit()
+        await session.refresh(order)
+        order_id = order.id
+
+    # Сохраняем order_id в FSM state
+    telegram_name = callback.from_user.first_name or "Друг"
+    await state.update_data(order_id=order_id, name=telegram_name)
     await state.set_state(BoxOrderForm.name)
 
     try:
-        await callback.message.edit_text(texts.BOX_ASK_NAME)
+        await callback.message.edit_text(
+            texts.BOX_ASK_NAME.format(name=telegram_name),
+            reply_markup=keyboards.box_confirm_name()
+        )
     except TelegramAPIError:
         pass
 
     # Скрываем reply keyboard на время ввода данных
-    await callback.message.answer(texts.BOX_ASK_NAME, reply_markup=keyboards.remove_reply_keyboard())
+    await callback.message.answer(
+        texts.BOX_ASK_NAME.format(name=telegram_name),
+        reply_markup=keyboards.remove_reply_keyboard()
+    )
 
     await callback.answer()
 
 
-# ===== ВВОД ИМЕНИ =====
+# ===== ПОДТВЕРЖДЕНИЕ ИМЕНИ КНОПКОЙ =====
+
+@router.callback_query(BoxOrderForm.name, F.data == "box_name_ok")
+async def box_name_confirmed(callback: CallbackQuery, state: FSMContext):
+    """Пользователь подтвердил имя из Telegram кнопкой."""
+    await state.set_state(BoxOrderForm.phone)
+
+    try:
+        await callback.message.edit_text(texts.BOX_ASK_PHONE)
+    except TelegramAPIError:
+        await callback.message.answer(texts.BOX_ASK_PHONE)
+
+    await callback.answer()
+
+
+# ===== ВВОД СВОЕГО ИМЕНИ =====
 
 @router.message(BoxOrderForm.name)
 async def process_box_name(message: Message, state: FSMContext):
-    """Обработка имени."""
+    """Обработка нового имени (если пользователь хочет изменить)."""
     valid, error = validate_name(message.text)
     if not valid:
         await message.answer(error)
@@ -180,22 +231,22 @@ async def process_box_name(message: Message, state: FSMContext):
 
     name = message.text.strip()
     await state.update_data(name=name)
-    await state.set_state(BoxOrderForm.email)
-    await message.answer(texts.BOX_ASK_EMAIL)
+    await state.set_state(BoxOrderForm.phone)
+    await message.answer(texts.BOX_ASK_PHONE)
 
 
-# ===== ВВОД EMAIL =====
+# ===== ВВОД ТЕЛЕФОНА =====
 
-@router.message(BoxOrderForm.email)
-async def process_box_email(message: Message, state: FSMContext):
-    """Обработка email."""
-    valid, error = validate_email(message.text)
+@router.message(BoxOrderForm.phone)
+async def process_box_phone(message: Message, state: FSMContext):
+    """Обработка телефона."""
+    valid, error = validate_phone(message.text)
     if not valid:
         await message.answer(error)
         return
 
-    email = message.text.strip().lower()
-    await state.update_data(email=email)
+    phone = message.text.strip()
+    await state.update_data(phone=phone)
     await state.set_state(BoxOrderForm.address)
     await message.answer(texts.BOX_ASK_ADDRESS)
 
@@ -220,7 +271,7 @@ async def process_box_address(message: Message, state: FSMContext):
     await message.answer(
         texts.BOX_CONFIRM.format(
             name=data["name"],
-            email=data["email"],
+            phone=data["phone"],
             address=address,
             month=month_display
         ),
@@ -228,41 +279,41 @@ async def process_box_address(message: Message, state: FSMContext):
     )
 
 
-# ===== ПОДТВЕРЖДЕНИЕ =====
+# ===== ПОДТВЕРЖДЕНИЕ ДАННЫХ =====
 
 @router.callback_query(BoxOrderForm.confirm, F.data == "box_confirm")
 async def confirm_box_order(callback: CallbackQuery, state: FSMContext, config: Config, bot: Bot):
-    """Подтверждение и создание заказа набора."""
-    # Получаем данные ДО очистки state (защита от double-click)
+    """Подтверждение данных — обновляем заказ в БД, показываем оплату."""
     data = await state.get_data()
 
     # Проверяем что данные есть
-    if not data or "name" not in data or "email" not in data or "address" not in data:
+    if not data or "order_id" not in data or "name" not in data or "phone" not in data or "address" not in data:
         await callback.answer("Сессия истекла. Начни заново с /box")
         await state.clear()
         return
 
-    # Сразу очищаем state чтобы повторный клик не создал второй заказ
+    order_id = data["order_id"]
+
+    # Очищаем state
     await state.clear()
 
-    month_key, month_display = get_box_month()
+    _, month_display = get_box_month()
 
-    # Сохраняем заказ в базу
+    # Обновляем заказ в БД
     async with get_session() as session:
-        order = BoxOrder(
-            telegram_id=callback.from_user.id,
-            name=data["name"],
-            email=data["email"],
-            address=data["address"],
-            box_month=month_key,
-            amount=config.product_price,
-            currency=config.product_currency,
-            status=BoxOrderStatus.PENDING
+        result = await session.execute(
+            select(BoxOrder).where(BoxOrder.id == order_id)
         )
-        session.add(order)
+        order = result.scalar_one_or_none()
+
+        if not order:
+            await callback.answer("Заказ не найден")
+            return
+
+        order.name = data["name"]
+        order.phone = data["phone"]
+        order.address = data["address"]
         await session.commit()
-        await session.refresh(order)
-        order_id = order.id
 
     # Отправляем ссылку на оплату
     try:
@@ -280,7 +331,7 @@ async def confirm_box_order(callback: CallbackQuery, state: FSMContext, config: 
     admin_text = f"""Новый предзаказ набора #{order_id}
 
 Имя: {data["name"]}
-Email: {data["email"]}
+Телефон: {data["phone"]}
 Адрес: {data["address"]}
 Набор: 1 {month_display}
 Сумма: {config.product_price} {config.product_currency}

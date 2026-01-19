@@ -135,15 +135,15 @@ async def reminders_no(callback: CallbackQuery, state: FSMContext):
         reminder_enabled=False
     )
 
-    # Убираем кнопки с предыдущего сообщения
+    # Редактируем текст предыдущего сообщения (затираем первое вторым)
     try:
-        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.message.edit_text(texts.ONBOARDING_NO_REMINDERS)
     except TelegramAPIError:
-        pass
+        await callback.message.answer(texts.ONBOARDING_NO_REMINDERS)
 
-    # Завершённое действие — отправляем новым сообщением с reply keyboard
+    # Reply Keyboard отправляем отдельным сообщением
     await callback.message.answer(
-        texts.ONBOARDING_NO_REMINDERS,
+        "⁣",  # невидимый символ для показа Reply Keyboard
         reply_markup=keyboards.main_reply_keyboard()
     )
 

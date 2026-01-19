@@ -96,6 +96,15 @@ def box_intro() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def box_confirm_name() -> InlineKeyboardMarkup:
+    """Подтверждение имени из Telegram."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text=texts.BTN_NAME_CORRECT, callback_data="box_name_ok")
+    )
+    return builder.as_markup()
+
+
 def box_confirm() -> InlineKeyboardMarkup:
     """Подтверждение данных предзаказа."""
     builder = InlineKeyboardBuilder()
