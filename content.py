@@ -490,16 +490,13 @@ class ContentManager:
 
     async def get_random_pause(self) -> str:
         """Кнопка 'Пауза', /pause, pause_now — стихи + музыка."""
-        # Гарантируем загрузку кэша (reload сам обрабатывает lock)
         await self.reload()
 
-        # Читаем из кэша под lock
-        async with self._lock:
-            all_content: list[str] = []
-            all_content.extend(self._cache.get("pause_long", []))
-            all_content.extend(self._cache.get("pause_music", []))
+        # Читаем без lock — dict read-safe, cache уже загружен
+        all_content: list[str] = []
+        all_content.extend(self._cache.get("pause_long", []))
+        all_content.extend(self._cache.get("pause_music", []))
 
-        # Fallback вне lock
         if not all_content:
             all_content = FALLBACK_PAUSE_POEMS + FALLBACK_PAUSE_MUSIC
 
@@ -507,16 +504,13 @@ class ContentManager:
 
     async def get_random_long_pause(self) -> str:
         """Кнопка 'Длинная пауза' — медитация + фильмы + книги."""
-        # Гарантируем загрузку кэша (reload сам обрабатывает lock)
         await self.reload()
 
-        # Читаем из кэша под lock
-        async with self._lock:
-            all_content: list[str] = []
-            for content_type in ["breathe", "movie", "book"]:
-                all_content.extend(self._cache.get(content_type, []))
+        # Читаем без lock — dict read-safe, cache уже загружен
+        all_content: list[str] = []
+        for content_type in ["breathe", "movie", "book"]:
+            all_content.extend(self._cache.get(content_type, []))
 
-        # Fallback вне lock
         if not all_content:
             all_content = FALLBACK_BREATHE + FALLBACK_MOVIES + FALLBACK_BOOKS
 
@@ -540,11 +534,10 @@ class ContentManager:
 
     async def _get_random_content(self, content_type: str, fallback: list[str]) -> str:
         """Получить случайный контент с fallback."""
-        # Гарантируем загрузку кэша (reload сам обрабатывает lock)
         await self.reload()
 
-        async with self._lock:
-            items = self._cache.get(content_type, [])
+        # Читаем без lock — dict read-safe, cache уже загружен
+        items = self._cache.get(content_type, [])
 
         if not items:
             logger.debug(f"No cached content for {content_type}, using fallback")
@@ -567,11 +560,10 @@ class ContentManager:
         Returns:
             Отформатированный текст
         """
-        # Гарантируем загрузку кэша (reload сам обрабатывает lock)
         await self.reload()
 
-        async with self._lock:
-            text = self._ui_cache.get(key)
+        # Читаем без lock — dict read-safe, cache уже загружен
+        text = self._ui_cache.get(key)
 
         if text is None:
             # Пробуем fallback из словаря
