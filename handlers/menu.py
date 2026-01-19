@@ -3,7 +3,8 @@
 """
 from aiogram import Router, F
 from aiogram.types import Message
-from aiogram.filters import StateFilter, Command
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 
 import texts
 import keyboards
@@ -50,25 +51,28 @@ async def cmd_settings(message: Message):
 # ===== REPLY KEYBOARD =====
 
 
-@router.message(F.text == texts.BTN_MENU_PAUSE, StateFilter(None))
-async def menu_pause(message: Message):
+@router.message(F.text == texts.BTN_MENU_PAUSE)
+async def menu_pause(message: Message, state: FSMContext):
     """Кнопка 'Пауза' — случайный текст из коротких пауз."""
+    await state.clear()  # Сбрасываем любое активное состояние
     content = ContentManager.get_instance()
     pause_text = await content.get_random_pause_short()
     await message.answer(pause_text, reply_markup=keyboards.main_reply_keyboard())
 
 
-@router.message(F.text == texts.BTN_MENU_LONG_PAUSE, StateFilter(None))
-async def menu_long_pause(message: Message):
+@router.message(F.text == texts.BTN_MENU_LONG_PAUSE)
+async def menu_long_pause(message: Message, state: FSMContext):
     """Кнопка 'Длинная пауза' — случайный контент (стихи, музыка, кино, книги)."""
+    await state.clear()
     content = ContentManager.get_instance()
     long_content = await content.get_random_long_content()
     await message.answer(long_content, reply_markup=keyboards.main_reply_keyboard())
 
 
-@router.message(F.text == texts.BTN_MENU_NEW_BOX, StateFilter(None))
-async def menu_new_box(message: Message):
+@router.message(F.text == texts.BTN_MENU_NEW_BOX)
+async def menu_new_box(message: Message, state: FSMContext):
     """Кнопка 'Новый набор' — переход к предзаказу."""
+    await state.clear()
     from handlers.box import get_box_month
     _, month_display = get_box_month()
     await message.answer(
@@ -77,9 +81,10 @@ async def menu_new_box(message: Message):
     )
 
 
-@router.message(F.text == texts.BTN_MENU_REMINDERS, StateFilter(None))
-async def menu_reminders(message: Message):
+@router.message(F.text == texts.BTN_MENU_REMINDERS)
+async def menu_reminders(message: Message, state: FSMContext):
     """Кнопка 'Напоминания' — настройка напоминаний."""
+    await state.clear()
     await message.answer(
         texts.ONBOARDING_ASK_REMINDERS,
         reply_markup=keyboards.onboarding_reminders()

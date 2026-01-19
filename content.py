@@ -32,6 +32,17 @@ FALLBACK_PAUSE_SHORT = [
     "пауза может случаться просто так",
     "простое присутствие имеет ценность",
     "к себе можно возвращаться медленно",
+    # Музыка
+    "https://youtu.be/YvAq6D3jHnY?si=OY1Gg7VbR5yu9D8r",
+    "https://youtu.be/8YTHFnv-eV0?si=Uo4SWRA3s_Y1H_8e",
+    "https://youtu.be/gnhJ4Ceor_M?si=jSyV0TM7gwjNxi6e",
+    "https://youtu.be/ycYN0IXA-4U?si=rT9mg36Pzxqr53mv",
+    "https://youtu.be/Q0d7ATDFZx0?si=sDOc0ZMnwD7Uw2Uo",
+    "https://youtu.be/84D_J05McA0?si=MQlCYJWbS3ji8FgJ",
+    "https://youtu.be/VNLrCWCv38Y?si=bqZaBhS7H98UgZUC",
+    "https://youtu.be/xN-fUozKM0k?si=MoZKMq6HaF_-sbYT",
+    "https://youtu.be/htQBS2Ikz6c?si=n0_OBV124kze1xyO",
+    "https://youtu.be/StWFJumEF7I?si=6svKGR2hhKh0-RVy",
 ]
 
 FALLBACK_PAUSE_LONG = [
