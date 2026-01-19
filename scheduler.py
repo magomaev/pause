@@ -123,9 +123,9 @@ class PauseScheduler:
             return current_hour == start_hour
 
     async def _send_pause(self, telegram_id: int) -> bool:
-        """Отправить паузу пользователю."""
+        """Отправить паузу пользователю — короткая фраза."""
         content = ContentManager.get_instance()
-        pause_text = await content.get_random_pause_short()
+        pause_text = await content.get_random_reminder()
 
         try:
             await self.bot.send_message(

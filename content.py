@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 # ===== FALLBACK ДАННЫЕ =====
 # Используются если Notion недоступен и БД пуста
 
-FALLBACK_PAUSE_SHORT = [
+# Короткие фразы — только для напоминаний
+FALLBACK_PAUSE_PHRASES = [
     "в тишине есть место",
     "фокус может ослабевать",
     "свой ритм — тоже ритм",
@@ -32,7 +33,10 @@ FALLBACK_PAUSE_SHORT = [
     "пауза может случаться просто так",
     "простое присутствие имеет ценность",
     "к себе можно возвращаться медленно",
-    # Музыка
+]
+
+# Музыка — для кнопки "Пауза"
+FALLBACK_PAUSE_MUSIC = [
     "https://youtu.be/YvAq6D3jHnY?si=OY1Gg7VbR5yu9D8r",
     "https://youtu.be/8YTHFnv-eV0?si=Uo4SWRA3s_Y1H_8e",
     "https://youtu.be/gnhJ4Ceor_M?si=jSyV0TM7gwjNxi6e",
@@ -45,7 +49,8 @@ FALLBACK_PAUSE_SHORT = [
     "https://youtu.be/StWFJumEF7I?si=6svKGR2hhKh0-RVy",
 ]
 
-FALLBACK_PAUSE_LONG = [
+# Стихи — для кнопки "Пауза"
+FALLBACK_PAUSE_POEMS = [
     """О счастье мы всегда лишь вспоминаем.
 А счастье всюду. Может быть, оно —
 Вот этот сад осенний за сараем
@@ -473,49 +478,56 @@ class ContentManager:
 
     # ===== КОНТЕНТ =====
 
-    async def get_random_pause_short(self) -> str:
-        """Случайная короткая пауза."""
-        return await self._get_random_content("pause_short", FALLBACK_PAUSE_SHORT)
-
-    async def get_random_pause_long(self) -> str:
-        """Случайная длинная пауза."""
-        return await self._get_random_content("pause_long", FALLBACK_PAUSE_LONG)
-
-    async def get_random_breathe(self) -> str:
-        """Случайная медитация."""
-        return await self._get_random_content("breathe", FALLBACK_BREATHE)
-
-    async def get_random_movie(self) -> str:
-        """Случайный фильм."""
-        return await self._get_random_content("movie", FALLBACK_MOVIES)
-
-    async def get_random_book(self) -> str:
-        """Случайная книга."""
-        return await self._get_random_content("book", FALLBACK_BOOKS)
-
-    async def get_random_long_content(self) -> str:
-        """Случайный контент из всех длинных пауз (стихи, музыка, кино, книги)."""
-        # Собираем всё в один пул
+    async def get_random_pause(self) -> str:
+        """Кнопка 'Пауза', /pause, pause_now — стихи + музыка."""
         all_content: list[str] = []
 
         if not self._loaded:
             await self.reload()
 
         async with self._lock:
-            # Добавляем из кэша
-            for content_type in ["pause_long", "breathe", "movie", "book"]:
+            # Из кэша: стихи (pause_long) + музыка (pause_music)
+            all_content.extend(self._cache.get("pause_long", []))
+            all_content.extend(self._cache.get("pause_music", []))
+
+        # Если кэш пуст — используем fallback
+        if not all_content:
+            all_content = FALLBACK_PAUSE_POEMS + FALLBACK_PAUSE_MUSIC
+
+        return random.choice(all_content)
+
+    async def get_random_long_pause(self) -> str:
+        """Кнопка 'Длинная пауза' — медитация + фильмы + книги."""
+        all_content: list[str] = []
+
+        if not self._loaded:
+            await self.reload()
+
+        async with self._lock:
+            for content_type in ["breathe", "movie", "book"]:
                 all_content.extend(self._cache.get(content_type, []))
 
         # Если кэш пуст — используем fallback
         if not all_content:
-            all_content = (
-                FALLBACK_PAUSE_LONG +
-                FALLBACK_BREATHE +
-                FALLBACK_MOVIES +
-                FALLBACK_BOOKS
-            )
+            all_content = FALLBACK_BREATHE + FALLBACK_MOVIES + FALLBACK_BOOKS
 
         return random.choice(all_content)
+
+    async def get_random_reminder(self) -> str:
+        """Напоминания — только короткие фразы."""
+        return await self._get_random_content("pause_phrases", FALLBACK_PAUSE_PHRASES)
+
+    async def get_random_breathe(self) -> str:
+        """Случайная медитация (для /breathe)."""
+        return await self._get_random_content("breathe", FALLBACK_BREATHE)
+
+    async def get_random_movie(self) -> str:
+        """Случайный фильм (для /movie)."""
+        return await self._get_random_content("movie", FALLBACK_MOVIES)
+
+    async def get_random_book(self) -> str:
+        """Случайная книга (для /book)."""
+        return await self._get_random_content("book", FALLBACK_BOOKS)
 
     async def _get_random_content(self, content_type: str, fallback: list[str]) -> str:
         """Получить случайный контент с fallback."""

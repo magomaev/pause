@@ -53,19 +53,19 @@ async def cmd_settings(message: Message):
 
 @router.message(F.text == texts.BTN_MENU_PAUSE)
 async def menu_pause(message: Message, state: FSMContext):
-    """Кнопка 'Пауза' — случайный текст из коротких пауз."""
+    """Кнопка 'Пауза' — стихи + музыка."""
     await state.clear()  # Сбрасываем любое активное состояние
     content = ContentManager.get_instance()
-    pause_text = await content.get_random_pause_short()
+    pause_text = await content.get_random_pause()
     await message.answer(pause_text, reply_markup=keyboards.main_reply_keyboard())
 
 
 @router.message(F.text == texts.BTN_MENU_LONG_PAUSE)
 async def menu_long_pause(message: Message, state: FSMContext):
-    """Кнопка 'Длинная пауза' — случайный контент (стихи, музыка, кино, книги)."""
+    """Кнопка 'Длинная пауза' — медитация + фильмы + книги."""
     await state.clear()
     content = ContentManager.get_instance()
-    long_content = await content.get_random_long_content()
+    long_content = await content.get_random_long_pause()
     await message.answer(long_content, reply_markup=keyboards.main_reply_keyboard())
 
 
