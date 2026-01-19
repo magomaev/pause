@@ -195,18 +195,10 @@ async def box_start(callback: CallbackQuery, state: FSMContext, config: Config):
     await state.update_data(order_id=order_id, name=telegram_name)
     await state.set_state(BoxOrderForm.name)
 
-    try:
-        await callback.message.edit_text(
-            texts.BOX_ASK_NAME.format(name=telegram_name),
-            reply_markup=keyboards.box_confirm_name()
-        )
-    except TelegramAPIError:
-        pass
-
     # Скрываем reply keyboard на время ввода данных
     await callback.message.answer(
         texts.BOX_ASK_NAME.format(name=telegram_name),
-        reply_markup=keyboards.remove_reply_keyboard()
+        reply_markup=keyboards.box_confirm_name()
     )
 
     await callback.answer()
@@ -324,16 +316,10 @@ async def confirm_box_order(callback: CallbackQuery, state: FSMContext, config: 
         await session.commit()
 
     # Отправляем ссылку на оплату
-    try:
-        await callback.message.edit_text(
-            texts.BOX_PAYMENT,
-            reply_markup=keyboards.box_payment(config.payment_link)
-        )
-    except TelegramAPIError:
-        await callback.message.answer(
-            texts.BOX_PAYMENT,
-            reply_markup=keyboards.box_payment(config.payment_link)
-        )
+    await callback.message.answer(
+        texts.BOX_PAYMENT,
+        reply_markup=keyboards.box_payment(config.payment_link)
+    )
 
     # Уведомляем админа
     admin_text = f"""Новый предзаказ набора #{order_id}
@@ -380,16 +366,10 @@ async def box_cancel(callback: CallbackQuery, state: FSMContext):
 
     _, month_display = get_box_month()
 
-    try:
-        await callback.message.edit_text(
-            texts.BOX_INTRO.format(month=month_display),
-            reply_markup=keyboards.box_intro()
-        )
-    except TelegramAPIError:
-        await callback.message.answer(
-            texts.BOX_INTRO.format(month=month_display),
-            reply_markup=keyboards.box_intro()
-        )
+    await callback.message.answer(
+        texts.BOX_INTRO.format(month=month_display),
+        reply_markup=keyboards.box_intro()
+    )
 
     await callback.answer()
 
