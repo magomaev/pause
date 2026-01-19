@@ -327,3 +327,51 @@ async def admin_reject_box_order(callback: CallbackQuery, bot: Bot, config: Conf
             pass
 
     await callback.answer("Отклонено")
+
+
+# ===== СИНХРОНИЗАЦИЯ С NOTION =====
+
+@router.message(Command("sync"))
+async def cmd_sync(message: Message, config: Config):
+    """Синхронизация контента с Notion."""
+    if message.from_user.id != config.admin_id:
+        return
+
+    # Проверка конфигурации
+    if not config.notion_token:
+        await message.answer("NOTION_TOKEN не настроен.\n\nДобавь в .env:\nNOTION_TOKEN=secret_xxx")
+        return
+
+    status_msg = await message.answer("Синхронизация...")
+
+    try:
+        # Синхронизируем
+        sync_service = NotionSyncService(config)
+        result = await sync_service.sync_all()
+
+        # Перезагружаем in-memory кэш
+        content_manager = ContentManager.get_instance()
+        await content_manager.reload()
+
+        # Валидация ключей UI
+        missing = content_manager.validate_ui_keys()
+
+        # Формируем отчет
+        text = f"""Синхронизация завершена
+
+Контент: {result['content']} записей
+UI тексты: {result['ui_texts']} записей"""
+
+        if missing:
+            text += f"\n\n⚠️ Отсутствуют ключи:\n{', '.join(missing[:10])}"
+            if len(missing) > 10:
+                text += f"\n...и ещё {len(missing) - 10}"
+
+        if result["errors"]:
+            text += f"\n\nОшибки:\n" + "\n".join(result["errors"])
+
+        await status_msg.edit_text(text)
+
+    except Exception as e:
+        logger.exception("Sync failed")
+        await status_msg.edit_text(f"Ошибка синхронизации:\n{e}")
