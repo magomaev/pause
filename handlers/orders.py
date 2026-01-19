@@ -16,17 +16,19 @@ from database import get_session, Order, OrderStatus
 router = Router()
 logger = logging.getLogger(__name__)
 
-# Regex для валидации email
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+# Regex для валидации телефона (международный формат)
+PHONE_REGEX = re.compile(r'^\+?[\d\s\-\(\)]{7,20}$')
 
 # Ограничения
 MAX_NAME_LENGTH = 100
 MIN_NAME_LENGTH = 2
+MIN_ADDRESS_LENGTH = 10
 
 
 class OrderForm(StatesGroup):
     name = State()
-    email = State()
+    phone = State()
+    address = State()
     confirm = State()
 
 
@@ -45,14 +47,26 @@ def validate_name(name: str) -> tuple[bool, str]:
     return True, ""
 
 
-def validate_email(email: str) -> tuple[bool, str]:
-    """Валидация email. Возвращает (valid, error_message)."""
-    if not email or not email.strip():
-        return False, "Email не может быть пустым. Попробуй ещё раз."
+def validate_phone(phone: str) -> tuple[bool, str]:
+    """Валидация телефона. Возвращает (valid, error_message)."""
+    if not phone or not phone.strip():
+        return False, "Телефон не может быть пустым. Попробуй ещё раз."
 
-    email = email.strip().lower()
-    if not EMAIL_REGEX.match(email):
-        return False, "Похоже, это не email. Попробуй ещё раз."
+    phone = phone.strip()
+    if not PHONE_REGEX.match(phone):
+        return False, "Похоже, это не телефон. Укажи номер в международном формате, например: +7 999 123 45 67"
+
+    return True, ""
+
+
+def validate_address(address: str) -> tuple[bool, str]:
+    """Валидация адреса. Возвращает (valid, error_message)."""
+    if not address or not address.strip():
+        return False, "Адрес не может быть пустым. Попробуй ещё раз."
+
+    address = address.strip()
+    if len(address) < MIN_ADDRESS_LENGTH:
+        return False, "Адрес слишком короткий. Укажи полный адрес: страна, город, улица, дом, квартира, индекс."
 
     return True, ""
 
@@ -84,25 +98,39 @@ async def process_name(message: Message, state: FSMContext):
 
     name = message.text.strip()
     await state.update_data(name=name)
-    await state.set_state(OrderForm.email)
-    await message.answer(texts.ORDER_EMAIL)
+    await state.set_state(OrderForm.phone)
+    await message.answer(texts.ORDER_PHONE)
 
 
-@router.message(OrderForm.email)
-async def process_email(message: Message, state: FSMContext):
-    """Обработка email пользователя."""
-    valid, error = validate_email(message.text)
+@router.message(OrderForm.phone)
+async def process_phone(message: Message, state: FSMContext):
+    """Обработка телефона пользователя."""
+    valid, error = validate_phone(message.text)
     if not valid:
         await message.answer(error)
         return
 
-    email = message.text.strip().lower()
-    await state.update_data(email=email)
+    phone = message.text.strip()
+    await state.update_data(phone=phone)
+    await state.set_state(OrderForm.address)
+    await message.answer(texts.ORDER_ADDRESS)
+
+
+@router.message(OrderForm.address)
+async def process_address(message: Message, state: FSMContext):
+    """Обработка адреса пользователя."""
+    valid, error = validate_address(message.text)
+    if not valid:
+        await message.answer(error)
+        return
+
+    address = message.text.strip()
+    await state.update_data(address=address)
     data = await state.get_data()
 
     await state.set_state(OrderForm.confirm)
     await message.answer(
-        texts.ORDER_CONFIRM.format(name=data["name"], email=email),
+        texts.ORDER_CONFIRM.format(name=data["name"], phone=data["phone"], address=address),
         reply_markup=keyboards.confirm_order()
     )
 
@@ -114,7 +142,7 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext, config: Conf
     data = await state.get_data()
 
     # Проверяем что данные есть
-    if not data or "name" not in data or "email" not in data:
+    if not data or "name" not in data or "phone" not in data or "address" not in data:
         await callback.answer("Сессия истекла. Начни заново с /start")
         await state.clear()
         return
@@ -127,7 +155,8 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext, config: Conf
         order = Order(
             telegram_id=callback.from_user.id,
             name=data["name"],
-            email=data["email"],
+            phone=data["phone"],
+            address=data["address"],
             amount=config.product_price,
             currency=config.product_currency,
             status=OrderStatus.PENDING
@@ -153,7 +182,8 @@ async def confirm_order(callback: CallbackQuery, state: FSMContext, config: Conf
     admin_text = f"""Новый заказ #{order_id}
 
 Имя: {data["name"]}
-Email: {data["email"]}
+Телефон: {data["phone"]}
+Адрес: {data["address"]}
 Сумма: {config.product_price} {config.product_currency}
 Telegram: @{callback.from_user.username or "—"}"""
 
@@ -188,7 +218,7 @@ async def cancel_order(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "i_paid")
 async def user_paid(callback: CallbackQuery, bot: Bot, config: Config):
     """Пользователь отметил оплату."""
-    order_email = "указанную почту"
+    order_phone = "указанный номер"
 
     async with get_session() as session:
         result = await session.execute(
@@ -208,7 +238,7 @@ async def user_paid(callback: CallbackQuery, bot: Bot, config: Config):
             order.status = OrderStatus.PAID
             order.paid_at = datetime.now(timezone.utc)
             await session.commit()
-            order_email = order.email or order_email
+            order_phone = order.phone or order_phone
             order_id = order.id
 
             # Уведомляем админа (с обработкой ошибок)
@@ -225,7 +255,7 @@ async def user_paid(callback: CallbackQuery, bot: Bot, config: Config):
 
     # Завершённое действие — отправляем новым сообщением, возвращаем меню
     await callback.message.answer(
-        texts.ORDER_THANKS.format(email=order_email),
+        texts.ORDER_THANKS.format(phone=order_phone),
         reply_markup=keyboards.main_reply_keyboard()
     )
 

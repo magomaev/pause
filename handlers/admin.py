@@ -46,7 +46,7 @@ async def cmd_orders(message: Message, config: Config):
             OrderStatus.CONFIRMED: "✅",
             OrderStatus.CANCELLED: "❌"
         }
-        text += f"{status_emoji.get(order.status, '?')} #{order.id} | {order.name} | {order.email} | {order.status.value}\n"
+        text += f"{status_emoji.get(order.status, '?')} #{order.id} | {order.name} | {order.phone} | {order.status.value}\n"
     
     await message.answer(text)
 
@@ -146,14 +146,14 @@ async def admin_confirm_order(callback: CallbackQuery, bot: Bot, config: Config)
         try:
             await bot.send_message(
                 order.telegram_id,
-                texts.ORDER_CONFIRMED.format(email=order.email or "указанную почту")
+                texts.ORDER_CONFIRMED
             )
         except TelegramAPIError as e:
             logger.warning(f"Failed to notify user {order.telegram_id}: {e}")
 
         try:
             await callback.message.edit_text(
-                f"✅ Заказ #{order_id} подтверждён.\nДоступ отправлен на {order.email}."
+                f"✅ Заказ #{order_id} подтверждён."
             )
         except TelegramAPIError:
             pass  # Сообщение уже изменено

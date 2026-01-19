@@ -79,7 +79,9 @@ class Order(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
     name: Mapped[str] = mapped_column(String(255))
-    email: Mapped[str] = mapped_column(String(255))
+    phone: Mapped[str] = mapped_column(String(50))
+    address: Mapped[str] = mapped_column(Text)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)  # Deprecated, для совместимости
     amount: Mapped[int] = mapped_column(default=79)
     currency: Mapped[str] = mapped_column(String(3), default="EUR")
     status: Mapped[OrderStatus] = mapped_column(SQLEnum(OrderStatus), default=OrderStatus.PENDING)
