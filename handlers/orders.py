@@ -16,6 +16,14 @@ from database import get_session, Order, OrderStatus
 router = Router()
 logger = logging.getLogger(__name__)
 
+# Кнопки reply keyboard — если пользователь нажал одну из них, выходим из FSM
+MENU_BUTTONS = {
+    texts.BTN_MENU_PAUSE,
+    texts.BTN_MENU_LONG_PAUSE,
+    texts.BTN_MENU_NEW_BOX,
+    texts.BTN_MENU_REMINDERS,
+}
+
 # Regex для валидации телефона (международный формат)
 PHONE_REGEX = re.compile(r'^\+?[\d\s\-\(\)]{7,20}$')
 
@@ -88,7 +96,7 @@ async def start_order(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.message(OrderForm.name)
+@router.message(OrderForm.name, ~F.text.in_(MENU_BUTTONS))
 async def process_name(message: Message, state: FSMContext):
     """Обработка имени пользователя."""
     valid, error = validate_name(message.text)
@@ -102,7 +110,7 @@ async def process_name(message: Message, state: FSMContext):
     await message.answer(texts.ORDER_PHONE)
 
 
-@router.message(OrderForm.phone)
+@router.message(OrderForm.phone, ~F.text.in_(MENU_BUTTONS))
 async def process_phone(message: Message, state: FSMContext):
     """Обработка телефона пользователя."""
     valid, error = validate_phone(message.text)
@@ -116,7 +124,7 @@ async def process_phone(message: Message, state: FSMContext):
     await message.answer(texts.ORDER_ADDRESS)
 
 
-@router.message(OrderForm.address)
+@router.message(OrderForm.address, ~F.text.in_(MENU_BUTTONS))
 async def process_address(message: Message, state: FSMContext):
     """Обработка адреса пользователя."""
     valid, error = validate_address(message.text)

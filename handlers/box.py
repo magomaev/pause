@@ -28,6 +28,14 @@ from database import get_session, BoxOrder, BoxOrderStatus
 router = Router()
 logger = logging.getLogger(__name__)
 
+# Кнопки reply keyboard — если пользователь нажал одну из них, выходим из FSM
+MENU_BUTTONS = {
+    texts.BTN_MENU_PAUSE,
+    texts.BTN_MENU_LONG_PAUSE,
+    texts.BTN_MENU_NEW_BOX,
+    texts.BTN_MENU_REMINDERS,
+}
+
 # Ограничения
 MAX_NAME_LENGTH = 100
 MIN_NAME_LENGTH = 2
@@ -221,7 +229,7 @@ async def box_name_confirmed(callback: CallbackQuery, state: FSMContext):
 
 # ===== ВВОД СВОЕГО ИМЕНИ =====
 
-@router.message(BoxOrderForm.name)
+@router.message(BoxOrderForm.name, ~F.text.in_(MENU_BUTTONS))
 async def process_box_name(message: Message, state: FSMContext):
     """Обработка нового имени (если пользователь хочет изменить)."""
     valid, error = validate_name(message.text)
@@ -237,7 +245,7 @@ async def process_box_name(message: Message, state: FSMContext):
 
 # ===== ВВОД ТЕЛЕФОНА =====
 
-@router.message(BoxOrderForm.phone)
+@router.message(BoxOrderForm.phone, ~F.text.in_(MENU_BUTTONS))
 async def process_box_phone(message: Message, state: FSMContext):
     """Обработка телефона."""
     valid, error = validate_phone(message.text)
@@ -253,7 +261,7 @@ async def process_box_phone(message: Message, state: FSMContext):
 
 # ===== ВВОД АДРЕСА =====
 
-@router.message(BoxOrderForm.address)
+@router.message(BoxOrderForm.address, ~F.text.in_(MENU_BUTTONS))
 async def process_box_address(message: Message, state: FSMContext):
     """Обработка адреса."""
     valid, error = validate_address(message.text)
