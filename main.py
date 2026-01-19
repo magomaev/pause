@@ -53,13 +53,15 @@ async def main():
     # Передаём config во все хэндлеры
     dp["config"] = config
 
-    # Регистрируем роутеры (порядок важен — menu первым для команд)
+    # Регистрируем роутеры (порядок важен!)
+    # 1. Команды и FSM — сначала, чтобы они имели приоритет
+    dp.include_router(onboarding_router)  # /start, /help, онбординг FSM
+    dp.include_router(pause_router)       # /pause
+    dp.include_router(box_router)         # предзаказ набора FSM
+    dp.include_router(orders_router)      # заказы FSM
+    dp.include_router(admin_router)       # админ команды
+    # 2. Menu последним — содержит catch-all для reply keyboard
     dp.include_router(menu_router)
-    dp.include_router(onboarding_router)
-    dp.include_router(pause_router)
-    dp.include_router(box_router)
-    dp.include_router(orders_router)
-    dp.include_router(admin_router)
 
     # Устанавливаем команды бота (кнопка Menu)
     await bot.set_my_commands([

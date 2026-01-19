@@ -127,9 +127,17 @@ async def menu_reminders(message: Message, state: FSMContext):
     )
 
 
-# ===== ДИАГНОСТИКА =====
+# ===== CATCH-ALL: необработанные текстовые сообщения =====
 
-@router.message()
-async def catch_all_menu(message: Message):
-    """Временный handler для диагностики необработанных сообщений."""
-    logger.warning(f"UNHANDLED in menu_router: user={message.from_user.id}, text={message.text!r}")
+@router.message(F.text)
+async def catch_all_text(message: Message):
+    """
+    Обработка необработанных текстовых сообщений.
+    Показывает reply keyboard если пользователь написал что-то непонятное.
+    """
+    logger.info(f"Unhandled text from user {message.from_user.id}: {message.text!r}")
+    # Просто показываем клавиатуру без лишних сообщений
+    await message.answer(
+        "Нажми кнопку внизу.",
+        reply_markup=keyboards.main_reply_keyboard()
+    )

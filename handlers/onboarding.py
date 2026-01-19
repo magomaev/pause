@@ -75,6 +75,8 @@ async def update_user_settings(
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     """Команда /start — начало онбординга."""
+    logger.info(f"/start from user {message.from_user.id} (@{message.from_user.username})")
+
     # Очищаем предыдущее состояние FSM
     await state.clear()
 
@@ -84,6 +86,7 @@ async def cmd_start(message: Message, state: FSMContext):
         message.from_user.username,
         message.from_user.first_name
     )
+    logger.info(f"User {message.from_user.id}: onboarding_completed={onboarding_completed}")
 
     # Если онбординг пройден — показываем reply keyboard
     if onboarding_completed:
@@ -91,13 +94,15 @@ async def cmd_start(message: Message, state: FSMContext):
             texts.WELCOME_BACK,
             reply_markup=keyboards.main_reply_keyboard()
         )
+        logger.info(f"Sent WELCOME_BACK to user {message.from_user.id}")
         return
 
-    # Иначе — начинаем онбординг
+    # Иначе — начинаем онбординг (сразу даём клавиатуру)
     await message.answer(
         texts.ONBOARDING_WELCOME,
         reply_markup=keyboards.main_reply_keyboard()
     )
+    logger.info(f"Sent ONBOARDING_WELCOME to user {message.from_user.id}")
 
 
 # ===== ЭКРАН 1: НУЖНЫ ЛИ НАПОМИНАНИЯ =====
