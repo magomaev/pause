@@ -490,31 +490,116 @@ class ContentManager:
 
     async def get_random_pause(self) -> str:
         """Кнопка 'Пауза', /pause, pause_now — стихи + музыка."""
+        content, _ = await self.get_random_pause_excluding(None)
+        return content
+
+    async def get_random_pause_excluding(
+        self, exclude_type: str | None
+    ) -> tuple[str, str]:
+        """
+        Кнопка 'Пауза' с циклическим чередованием типа контента.
+        Цикл: pause_long → pause_music → pause_long → ...
+
+        Args:
+            exclude_type: Предыдущий тип контента
+
+        Returns:
+            (контент, тип_контента)
+        """
+        logger.info(f"get_random_pause_excluding(exclude_type={exclude_type}) called")
         await self.reload()
 
-        # Читаем без lock — dict read-safe, cache уже загружен
-        all_content: list[str] = []
-        all_content.extend(self._cache.get("pause_long", []))
-        all_content.extend(self._cache.get("pause_music", []))
+        # Порядок типов для цикла
+        type_cycle = ["pause_long", "pause_music"]
 
-        if not all_content:
-            all_content = FALLBACK_PAUSE_POEMS + FALLBACK_PAUSE_MUSIC
+        # Собираем контент по типам
+        content_by_type: dict[str, list[str]] = {}
+        for ctype in type_cycle:
+            items = self._cache.get(ctype, [])
+            if items:
+                content_by_type[ctype] = items
 
-        return random.choice(all_content)
+        # Fallback если кэш пуст
+        if not content_by_type:
+            logger.info("Using fallback for pause")
+            content_by_type = {
+                "pause_long": FALLBACK_PAUSE_POEMS,
+                "pause_music": FALLBACK_PAUSE_MUSIC,
+            }
+
+        # Определяем доступные типы (которые есть в кэше)
+        available_types = [t for t in type_cycle if t in content_by_type]
+
+        # Выбираем следующий тип по циклу
+        if exclude_type and exclude_type in available_types and len(available_types) > 1:
+            current_idx = available_types.index(exclude_type)
+            next_idx = (current_idx + 1) % len(available_types)
+            selected_type = available_types[next_idx]
+        else:
+            # Первый вызов или тип недоступен — начинаем с первого
+            selected_type = available_types[0]
+
+        result = random.choice(content_by_type[selected_type])
+
+        logger.info(f"get_random_pause_excluding returning type={selected_type}: {result[:50]}...")
+        return result, selected_type
 
     async def get_random_long_pause(self) -> str:
         """Кнопка 'Длинная пауза' — медитация + фильмы + книги."""
+        content, _ = await self.get_random_long_pause_excluding(None)
+        return content
+
+    async def get_random_long_pause_excluding(
+        self, exclude_type: str | None
+    ) -> tuple[str, str]:
+        """
+        Кнопка 'Длинная пауза' с циклическим чередованием типа контента.
+        Цикл: breathe → movie → book → breathe → ...
+
+        Args:
+            exclude_type: Предыдущий тип контента
+
+        Returns:
+            (контент, тип_контента)
+        """
+        logger.info(f"get_random_long_pause_excluding(exclude_type={exclude_type}) called")
         await self.reload()
 
-        # Читаем без lock — dict read-safe, cache уже загружен
-        all_content: list[str] = []
-        for content_type in ["breathe", "movie", "book"]:
-            all_content.extend(self._cache.get(content_type, []))
+        # Порядок типов для цикла
+        type_cycle = ["breathe", "movie", "book"]
 
-        if not all_content:
-            all_content = FALLBACK_BREATHE + FALLBACK_MOVIES + FALLBACK_BOOKS
+        # Собираем контент по типам
+        content_by_type: dict[str, list[str]] = {}
+        for ctype in type_cycle:
+            items = self._cache.get(ctype, [])
+            if items:
+                content_by_type[ctype] = items
 
-        return random.choice(all_content)
+        # Fallback если кэш пуст
+        if not content_by_type:
+            logger.info("Using fallback for long_pause")
+            content_by_type = {
+                "breathe": FALLBACK_BREATHE,
+                "movie": FALLBACK_MOVIES,
+                "book": FALLBACK_BOOKS,
+            }
+
+        # Определяем доступные типы (которые есть в кэше)
+        available_types = [t for t in type_cycle if t in content_by_type]
+
+        # Выбираем следующий тип по циклу
+        if exclude_type and exclude_type in available_types and len(available_types) > 1:
+            current_idx = available_types.index(exclude_type)
+            next_idx = (current_idx + 1) % len(available_types)
+            selected_type = available_types[next_idx]
+        else:
+            # Первый вызов или тип недоступен — начинаем с первого
+            selected_type = available_types[0]
+
+        result = random.choice(content_by_type[selected_type])
+
+        logger.info(f"get_random_long_pause_excluding returning type={selected_type}: {result[:50]}...")
+        return result, selected_type
 
     async def get_random_reminder(self) -> str:
         """Напоминания — только короткие фразы."""

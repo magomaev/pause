@@ -1,6 +1,7 @@
 """
 Обработчики главного меню (команды и Reply Keyboard).
 """
+import logging
 from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.filters import Command
@@ -11,6 +12,7 @@ import keyboards
 from content import ContentManager
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 # ===== КОМАНДЫ (кнопка Menu) =====
@@ -53,25 +55,58 @@ async def cmd_settings(message: Message):
 
 @router.message(F.text == texts.BTN_MENU_PAUSE)
 async def menu_pause(message: Message, state: FSMContext):
-    """Кнопка 'Пауза' — стихи + музыка."""
-    await state.clear()  # Сбрасываем любое активное состояние
+    """Кнопка 'Пауза' — стихи + музыка с чередованием типа."""
+    logger.info(f"menu_pause called by user {message.from_user.id}")
+
+    # Сохраняем данные о последнем контенте перед очисткой состояния
+    data = await state.get_data()
+    last_pause_type = data.get("last_pause_type")
+    last_long_pause_type = data.get("last_long_pause_type")
+
+    await state.clear()  # Сбрасываем любое активное состояние (формы и т.д.)
+
     content = ContentManager.get_instance()
-    pause_text = await content.get_random_pause()
+    pause_text, content_type = await content.get_random_pause_excluding(last_pause_type)
+
+    # Сохраняем тип контента для следующего раза
+    await state.update_data(
+        last_pause_type=content_type,
+        last_long_pause_type=last_long_pause_type,
+    )
+
+    logger.info(f"Sending pause content (type={content_type}): {pause_text[:50]}...")
     await message.answer(pause_text, reply_markup=keyboards.main_reply_keyboard())
 
 
 @router.message(F.text == texts.BTN_MENU_LONG_PAUSE)
 async def menu_long_pause(message: Message, state: FSMContext):
-    """Кнопка 'Длинная пауза' — медитация + фильмы + книги."""
+    """Кнопка 'Длинная пауза' — медитация + фильмы + книги с чередованием типа."""
+    logger.info(f"menu_long_pause called by user {message.from_user.id}")
+
+    # Сохраняем данные о последнем контенте перед очисткой состояния
+    data = await state.get_data()
+    last_pause_type = data.get("last_pause_type")
+    last_long_pause_type = data.get("last_long_pause_type")
+
     await state.clear()
+
     content = ContentManager.get_instance()
-    long_content = await content.get_random_long_pause()
+    long_content, content_type = await content.get_random_long_pause_excluding(last_long_pause_type)
+
+    # Сохраняем тип контента для следующего раза
+    await state.update_data(
+        last_pause_type=last_pause_type,
+        last_long_pause_type=content_type,
+    )
+
+    logger.info(f"Sending long pause content (type={content_type}): {long_content[:50]}...")
     await message.answer(long_content, reply_markup=keyboards.main_reply_keyboard())
 
 
 @router.message(F.text == texts.BTN_MENU_NEW_BOX)
 async def menu_new_box(message: Message, state: FSMContext):
     """Кнопка 'Новый набор' — переход к предзаказу."""
+    logger.info(f"menu_new_box called by user {message.from_user.id}")
     await state.clear()
     from handlers.box import get_box_month
     _, month_display = get_box_month()
@@ -84,8 +119,17 @@ async def menu_new_box(message: Message, state: FSMContext):
 @router.message(F.text == texts.BTN_MENU_REMINDERS)
 async def menu_reminders(message: Message, state: FSMContext):
     """Кнопка 'Напоминания' — настройка напоминаний."""
+    logger.info(f"menu_reminders called by user {message.from_user.id}")
     await state.clear()
     await message.answer(
         texts.ONBOARDING_ASK_REMINDERS,
         reply_markup=keyboards.onboarding_reminders()
     )
+
+
+# ===== ДИАГНОСТИКА =====
+
+@router.message()
+async def catch_all_menu(message: Message):
+    """Временный handler для диагностики необработанных сообщений."""
+    logger.warning(f"UNHANDLED in menu_router: user={message.from_user.id}, text={message.text!r}")
