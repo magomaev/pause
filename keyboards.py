@@ -5,15 +5,6 @@ import texts
 
 # ===== ОНБОРДИНГ =====
 
-def onboarding_welcome() -> InlineKeyboardMarkup:
-    """Экран 0: приветствие."""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=texts.BTN_SETUP_PAUSE, callback_data="setup_pause")
-    )
-    return builder.as_markup()
-
-
 def onboarding_reminders() -> InlineKeyboardMarkup:
     """Экран 1: нужны ли напоминания."""
     builder = InlineKeyboardBuilder()
