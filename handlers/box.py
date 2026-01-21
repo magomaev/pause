@@ -9,7 +9,6 @@
 5. Подтверждение данных
 6. Ссылка на оплату
 """
-import re
 import logging
 from datetime import datetime, timezone
 from aiogram import Router, F, Bot
@@ -41,15 +40,13 @@ MAX_NAME_LENGTH = 100
 MIN_NAME_LENGTH = 2
 MAX_ADDRESS_LENGTH = 500
 MIN_ADDRESS_LENGTH = 20
-
-# Regex для валидации телефона
-PHONE_REGEX = re.compile(r'^\+?[0-9\s\-\(\)]{7,20}$')
+MIN_CONTACT_LENGTH = 3
 
 
 class BoxOrderForm(StatesGroup):
     """FSM для предзаказа набора."""
     name = State()      # Подтверждение/изменение имени
-    phone = State()     # Ввод телефона
+    contact = State()   # Ввод контакта
     address = State()   # Ввод адреса
     confirm = State()   # Подтверждение данных
 
@@ -103,14 +100,13 @@ def validate_name(name: str) -> tuple[bool, str]:
     return True, ""
 
 
-def validate_phone(phone: str) -> tuple[bool, str]:
-    """Валидация телефона. Возвращает (valid, error_message)."""
-    if not phone or not phone.strip():
-        return False, "Телефон не может быть пустым. Попробуй ещё раз."
+def validate_contact(contact: str) -> tuple[bool, str]:
+    """Валидация контакта. Возвращает (valid, error_message)."""
+    if not contact or not contact.strip():
+        return False, "Контакт не может быть пустым. Попробуй ещё раз."
 
-    phone = phone.strip()
-    if not PHONE_REGEX.match(phone):
-        return False, "Укажи корректный номер телефона."
+    if len(contact.strip()) < MIN_CONTACT_LENGTH:
+        return False, "Контакт слишком короткий."
 
     return True, ""
 
@@ -209,12 +205,19 @@ async def box_start(callback: CallbackQuery, state: FSMContext, config: Config):
 @router.callback_query(BoxOrderForm.name, F.data == "box_name_ok")
 async def box_name_confirmed(callback: CallbackQuery, state: FSMContext):
     """Пользователь подтвердил имя из Telegram кнопкой."""
-    await state.set_state(BoxOrderForm.phone)
+    await state.set_state(BoxOrderForm.contact)
+
+    # Предлагаем использовать текущий Telegram username если есть
+    username = callback.from_user.username
+    if username:
+        contact_text = texts.BOX_ASK_CONTACT_WITH_USERNAME.format(username=username)
+    else:
+        contact_text = texts.BOX_ASK_CONTACT
 
     try:
-        await callback.message.edit_text(texts.BOX_ASK_PHONE)
+        await callback.message.edit_text(contact_text)
     except TelegramAPIError:
-        await callback.message.answer(texts.BOX_ASK_PHONE)
+        await callback.message.answer(contact_text)
 
     await callback.answer()
 
@@ -231,22 +234,28 @@ async def process_box_name(message: Message, state: FSMContext):
 
     name = message.text.strip()
     await state.update_data(name=name)
-    await state.set_state(BoxOrderForm.phone)
-    await message.answer(texts.BOX_ASK_PHONE)
+    await state.set_state(BoxOrderForm.contact)
+
+    # Предлагаем использовать текущий Telegram username если есть
+    username = message.from_user.username
+    if username:
+        await message.answer(texts.BOX_ASK_CONTACT_WITH_USERNAME.format(username=username))
+    else:
+        await message.answer(texts.BOX_ASK_CONTACT)
 
 
-# ===== ВВОД ТЕЛЕФОНА =====
+# ===== ВВОД КОНТАКТА =====
 
-@router.message(BoxOrderForm.phone, ~F.text.in_(MENU_BUTTONS))
-async def process_box_phone(message: Message, state: FSMContext):
-    """Обработка телефона."""
-    valid, error = validate_phone(message.text)
+@router.message(BoxOrderForm.contact, ~F.text.in_(MENU_BUTTONS))
+async def process_box_contact(message: Message, state: FSMContext):
+    """Обработка контакта."""
+    valid, error = validate_contact(message.text)
     if not valid:
         await message.answer(error)
         return
 
-    phone = message.text.strip()
-    await state.update_data(phone=phone)
+    contact = message.text.strip()
+    await state.update_data(contact=contact)
     await state.set_state(BoxOrderForm.address)
     await message.answer(texts.BOX_ASK_ADDRESS)
 
@@ -271,7 +280,7 @@ async def process_box_address(message: Message, state: FSMContext):
     await message.answer(
         texts.BOX_CONFIRM.format(
             name=data["name"],
-            phone=data["phone"],
+            contact=data["contact"],
             address=address,
             month=month_display
         ),
@@ -287,7 +296,7 @@ async def confirm_box_order(callback: CallbackQuery, state: FSMContext, config: 
     data = await state.get_data()
 
     # Проверяем что данные есть
-    if not data or "order_id" not in data or "name" not in data or "phone" not in data or "address" not in data:
+    if not data or "order_id" not in data or "name" not in data or "contact" not in data or "address" not in data:
         await callback.answer("Сессия истекла. Начни заново с /box")
         await state.clear()
         return
@@ -311,7 +320,7 @@ async def confirm_box_order(callback: CallbackQuery, state: FSMContext, config: 
             return
 
         order.name = data["name"]
-        order.phone = data["phone"]
+        order.phone = data["contact"]  # поле в БД называется phone
         order.address = data["address"]
         await session.commit()
 
@@ -325,7 +334,7 @@ async def confirm_box_order(callback: CallbackQuery, state: FSMContext, config: 
     admin_text = f"""Новый предзаказ набора #{order_id}
 
 Имя: {data["name"]}
-Телефон: {data["phone"]}
+Контакт: {data["contact"]}
 Адрес: {data["address"]}
 Набор: 1 {month_display}
 Сумма: {config.product_price} {config.product_currency}
