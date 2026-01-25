@@ -15,15 +15,6 @@ def onboarding_reminders() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def onboarding_no_reminders() -> InlineKeyboardMarkup:
-    """Экран 2A: без напоминаний."""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=texts.BTN_PAUSE_NOW, callback_data="pause_now")
-    )
-    return builder.as_markup()
-
-
 def onboarding_frequency() -> InlineKeyboardMarkup:
     """Экран 2B: выбор частоты."""
     builder = InlineKeyboardBuilder()
@@ -49,26 +40,6 @@ def onboarding_time() -> InlineKeyboardMarkup:
     builder.row(
         InlineKeyboardButton(text=texts.BTN_TIME_EVENING, callback_data="time_evening"),
         InlineKeyboardButton(text=texts.BTN_TIME_RANDOM, callback_data="time_random")
-    )
-    return builder.as_markup()
-
-
-def onboarding_complete() -> InlineKeyboardMarkup:
-    """Экран 4B: завершение настройки."""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=texts.BTN_PAUSE_NOW, callback_data="pause_now")
-    )
-    return builder.as_markup()
-
-
-# ===== ПАУЗЫ =====
-
-def pause_menu() -> InlineKeyboardMarkup:
-    """Меню после паузы."""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=texts.BTN_PAUSE_NOW, callback_data="pause_now")
     )
     return builder.as_markup()
 
@@ -116,15 +87,6 @@ def box_payment(payment_link: str) -> InlineKeyboardMarkup:
     )
     builder.row(
         InlineKeyboardButton(text=texts.BTN_PAID, callback_data="box_paid")
-    )
-    return builder.as_markup()
-
-
-def box_after_later() -> InlineKeyboardMarkup:
-    """После 'вернуться позже'."""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=texts.BTN_PAUSE_NOW, callback_data="pause_now")
     )
     return builder.as_markup()
 

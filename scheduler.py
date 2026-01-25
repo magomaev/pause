@@ -10,7 +10,6 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from sqlalchemy import select
 
-import keyboards
 from database import get_session, User, ReminderFrequency, ReminderTime
 from content import ContentManager
 
@@ -128,11 +127,7 @@ class PauseScheduler:
         pause_text = await content.get_random_reminder()
 
         try:
-            await self.bot.send_message(
-                telegram_id,
-                pause_text,
-                reply_markup=keyboards.pause_menu()
-            )
+            await self.bot.send_message(telegram_id, pause_text)
             return True
         except TelegramAPIError as e:
             logger.warning(f"Failed to send pause to {telegram_id}: {e}")

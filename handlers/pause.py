@@ -6,7 +6,6 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
-import keyboards
 from content import ContentManager
 
 router = Router()
@@ -22,7 +21,7 @@ async def cmd_pause(message: Message, state: FSMContext):
     pause_text, content_type = await content.get_random_pause_excluding(last_type)
 
     await state.update_data(last_pause_type=content_type)
-    await message.answer(pause_text, reply_markup=keyboards.pause_menu())
+    await message.answer(pause_text)
 
 
 @router.callback_query(F.data == "pause_now")
@@ -37,9 +36,6 @@ async def callback_pause_now(callback: CallbackQuery, state: FSMContext):
     await state.update_data(last_pause_type=content_type)
 
     # Паузы — это завершённые действия, отправляем новым сообщением
-    await callback.message.answer(
-        pause_text,
-        reply_markup=keyboards.pause_menu()
-    )
+    await callback.message.answer(pause_text)
 
     await callback.answer()
