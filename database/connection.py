@@ -43,9 +43,18 @@ async def init_db(database_url: str | None = None):
         "echo": False,
     }
 
-    if not is_sqlite:
-        # pool_pre_ping не поддерживается для SQLite (NullPool)
-        engine_kwargs["pool_pre_ping"] = True
+    if is_sqlite:
+        # SQLite использует NullPool, настраиваем только connect_args
+        engine_kwargs["connect_args"] = {"check_same_thread": False}
+    else:
+        # PostgreSQL: полная конфигурация пула соединений
+        engine_kwargs.update({
+            "pool_pre_ping": True,      # Проверка соединения перед использованием
+            "pool_size": 5,             # Базовый размер пула
+            "max_overflow": 10,         # Дополнительные соединения при пике
+            "pool_recycle": 1800,       # Переподключение каждые 30 минут
+            "pool_timeout": 30,         # Таймаут ожидания соединения из пула
+        })
 
     engine = create_async_engine(database_url, **engine_kwargs)
     async_session = async_sessionmaker(engine, expire_on_commit=False)

@@ -1,5 +1,10 @@
+import re
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Regex для валидации формата Telegram bot token
+# Формат: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz (8-10 цифр : 35 символов base64)
+BOT_TOKEN_PATTERN = re.compile(r"^\d{8,10}:[A-Za-z0-9_-]{35}$")
 
 
 class Config(BaseSettings):
@@ -35,8 +40,12 @@ class Config(BaseSettings):
     def validate_bot_token(cls, v: str) -> str:
         if not v or v == "":
             raise ValueError("BOT_TOKEN is required")
-        if ":" not in v:
-            raise ValueError("BOT_TOKEN format invalid (expected 'id:hash')")
+        if not BOT_TOKEN_PATTERN.match(v):
+            raise ValueError(
+                "BOT_TOKEN format invalid. "
+                "Expected format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz "
+                "(8-10 digits, colon, 35 alphanumeric characters)"
+            )
         return v
 
     @field_validator("payment_link")

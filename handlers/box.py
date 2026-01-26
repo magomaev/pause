@@ -35,12 +35,15 @@ MENU_BUTTONS = {
     texts.BTN_MENU_REMINDERS,
 }
 
-# Ограничения
+# Ограничения валидации
 MAX_NAME_LENGTH = 100
 MIN_NAME_LENGTH = 2
 MAX_ADDRESS_LENGTH = 500
 MIN_ADDRESS_LENGTH = 20
 MIN_CONTACT_LENGTH = 3
+
+# Бизнес-логика предзаказов
+BOX_ORDER_CUTOFF_DAY = 20  # До этого дня месяца можно заказать набор на следующий месяц
 
 
 class BoxOrderForm(StatesGroup):
@@ -54,8 +57,8 @@ class BoxOrderForm(StatesGroup):
 def get_box_month() -> tuple[str, str]:
     """
     Определить месяц набора.
-    До 20 числа → 1 следующего месяца.
-    После 20 → 1 числа через месяц.
+    До BOX_ORDER_CUTOFF_DAY числа → 1 следующего месяца.
+    После BOX_ORDER_CUTOFF_DAY → 1 числа через месяц.
 
     Returns:
         (month_key, month_display): ("2026-02", "февраля")
@@ -64,7 +67,7 @@ def get_box_month() -> tuple[str, str]:
     year = now.year
     month = now.month
 
-    if now.day <= 20:
+    if now.day <= BOX_ORDER_CUTOFF_DAY:
         # Набор будет 1 числа следующего месяца
         target_month = month + 1
         target_year = year
@@ -169,13 +172,18 @@ async def box_start(callback: CallbackQuery, state: FSMContext, config: Config):
     """
     Пользователю откликается — создаём заказ в БД сразу.
     Показываем имя из Telegram для подтверждения.
+
+    Используем SELECT FOR UPDATE для предотвращения race condition
+    (работает в PostgreSQL, игнорируется в SQLite).
     """
     month_key, month_display = get_box_month()
 
     async with get_session() as session:
         # Проверяем нет ли уже активного заказа на этот месяц
+        # with_for_update() блокирует строки до конца транзакции (PostgreSQL)
         existing = await session.execute(
-            select(BoxOrder).where(
+            select(BoxOrder)
+            .where(
                 BoxOrder.telegram_id == callback.from_user.id,
                 BoxOrder.box_month == month_key,
                 BoxOrder.status.in_([
@@ -185,6 +193,7 @@ async def box_start(callback: CallbackQuery, state: FSMContext, config: Config):
                     BoxOrderStatus.SHIPPED,
                 ])
             )
+            .with_for_update(skip_locked=True)
         )
         if existing.scalar_one_or_none():
             await callback.answer("У тебя уже есть предзаказ на этот месяц")
@@ -392,14 +401,16 @@ async def box_later(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "box_cancel")
 async def box_cancel(callback: CallbackQuery, state: FSMContext):
-    """Отмена заказа набора."""
+    """Отмена заказа набора.
+
+    ВАЖНО: state.clear() вызывается ПОСЛЕ успешного commit в БД,
+    чтобы при сбое БД не потерять состояние FSM.
+    """
     # Получаем order_id до очистки state
     data = await state.get_data()
     order_id = data.get("order_id")
 
-    await state.clear()
-
-    # Отменяем заказ в БД если он был создан
+    # Отменяем заказ в БД если он был создан (ДО очистки state)
     if order_id:
         async with get_session() as session:
             result = await session.execute(
@@ -409,6 +420,9 @@ async def box_cancel(callback: CallbackQuery, state: FSMContext):
             if order and order.status == BoxOrderStatus.PENDING:
                 order.status = BoxOrderStatus.CANCELLED
                 await session.commit()
+
+    # Очищаем state ПОСЛЕ успешного commit
+    await state.clear()
 
     _, month_display = get_box_month()
 

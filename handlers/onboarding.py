@@ -20,6 +20,32 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
+def mask_user_for_log(telegram_id: int, username: str | None = None) -> str:
+    """
+    Маскировка данных пользователя для логов (GDPR compliance).
+
+    Вместо полного telegram_id и username показываем частично замаскированные данные.
+    Пример: "user 123***89 (@al***)" вместо "user 123456789 (@aleksey)"
+    """
+    # Маскируем telegram_id: показываем первые 3 и последние 2 цифры
+    id_str = str(telegram_id)
+    if len(id_str) > 5:
+        masked_id = f"{id_str[:3]}***{id_str[-2:]}"
+    else:
+        masked_id = f"{id_str[:2]}***"
+
+    # Маскируем username
+    if username:
+        if len(username) > 3:
+            masked_name = f"@{username[:2]}***"
+        else:
+            masked_name = "@***"
+    else:
+        masked_name = "no_username"
+
+    return f"user {masked_id} ({masked_name})"
+
+
 class OnboardingForm(StatesGroup):
     """FSM для онбординга."""
     reminder_choice = State()  # Да/Нет на напоминания
@@ -77,7 +103,7 @@ async def update_user_settings(
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, config: Config):
     """Команда /start — начало онбординга."""
-    logger.info(f"/start from user {message.from_user.id} (@{message.from_user.username})")
+    logger.info(f"/start from {mask_user_for_log(message.from_user.id, message.from_user.username)}")
 
     # Очищаем предыдущее состояние FSM
     await state.clear()
@@ -88,7 +114,7 @@ async def cmd_start(message: Message, state: FSMContext, config: Config):
         message.from_user.username,
         message.from_user.first_name
     )
-    logger.info(f"User {message.from_user.id}: onboarding_completed={onboarding_completed}")
+    logger.info(f"{mask_user_for_log(message.from_user.id)}: onboarding_completed={onboarding_completed}")
 
     # Если онбординг пройден — показываем reply keyboard
     if onboarding_completed:
@@ -96,7 +122,7 @@ async def cmd_start(message: Message, state: FSMContext, config: Config):
             texts.WELCOME_BACK,
             reply_markup=keyboards.main_reply_keyboard()
         )
-        logger.info(f"Sent WELCOME_BACK to user {message.from_user.id}")
+        logger.info(f"Sent WELCOME_BACK to {mask_user_for_log(message.from_user.id)}")
         return
 
     # Иначе — начинаем онбординг
@@ -111,7 +137,7 @@ async def cmd_start(message: Message, state: FSMContext, config: Config):
             texts.ONBOARDING_WELCOME,
             reply_markup=keyboards.main_reply_keyboard()
         )
-    logger.info(f"Sent ONBOARDING_WELCOME to user {message.from_user.id}")
+    logger.info(f"Sent ONBOARDING_WELCOME to {mask_user_for_log(message.from_user.id)}")
 
     # Спрашиваем о напоминаниях
     await state.set_state(OnboardingForm.reminder_choice)
@@ -296,11 +322,19 @@ async def select_time(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# ===== ПОЛУЧИТЬ FILE_ID ФОТО =====
+# ===== ПОЛУЧИТЬ FILE_ID ФОТО (ТОЛЬКО ДЛЯ АДМИНА) =====
 
 @router.message(F.photo)
-async def get_photo_file_id(message: Message):
-    """Получить file_id фото (для настройки welcome photo)."""
+async def get_photo_file_id(message: Message, config: Config):
+    """Получить file_id фото (для настройки welcome photo).
+
+    Доступно только админу для получения file_id изображений.
+    Обычные пользователи не получают ответа на отправленные фото.
+    """
+    # Ограничиваем только для админа
+    if message.from_user.id != config.admin_id:
+        return  # Игнорируем фото от обычных пользователей
+
     file_id = message.photo[-1].file_id
     await message.reply(f"`{file_id}`", parse_mode="Markdown")
 
@@ -327,7 +361,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
         )
         return
 
-    logger.info(f"User {message.from_user.id} cancelled state {current_state}")
+    logger.info(f"{mask_user_for_log(message.from_user.id)} cancelled state {current_state}")
     await state.clear()
     await message.answer(
         "Действие отменено.",

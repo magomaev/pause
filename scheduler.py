@@ -16,6 +16,10 @@ from content import ContentManager
 
 logger = logging.getLogger(__name__)
 
+# ===== КОНСТАНТЫ ПЛАНИРОВЩИКА =====
+SCHEDULER_BATCH_SIZE = 100  # Пользователей за один батч
+SCHEDULER_BATCH_DELAY = 0.1  # Секунд между батчами (Telegram API rate limit)
+
 
 # Временные диапазоны (час UTC)
 TIME_RANGES = {
@@ -63,7 +67,6 @@ class PauseScheduler:
         logger.debug(f"Checking pauses at {now}, hour={current_hour}, weekday={current_weekday}")
 
         sent_count = 0
-        batch_size = 100  # Обрабатываем по 100 пользователей за раз
 
         # Используем пагинацию для экономии памяти
         offset = 0
@@ -76,7 +79,7 @@ class PauseScheduler:
                         User.onboarding_completed == True  # noqa: E712
                     )
                     .offset(offset)
-                    .limit(batch_size)
+                    .limit(SCHEDULER_BATCH_SIZE)
                 )
                 users = result.scalars().all()
 
@@ -89,11 +92,11 @@ class PauseScheduler:
                         if success:
                             sent_count += 1
 
-                offset += batch_size
+                offset += SCHEDULER_BATCH_SIZE
 
                 # Небольшая пауза между батчами чтобы не перегружать Telegram API
-                if len(users) == batch_size:
-                    await asyncio.sleep(0.1)
+                if len(users) == SCHEDULER_BATCH_SIZE:
+                    await asyncio.sleep(SCHEDULER_BATCH_DELAY)
 
         if sent_count > 0:
             logger.info(f"Sent {sent_count} pause reminders at hour {current_hour}")

@@ -1,7 +1,11 @@
 from datetime import datetime, timezone
 from enum import Enum
-from sqlalchemy import BigInteger, DateTime, String, Text, Boolean, Enum as SQLEnum, Index
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from typing import TYPE_CHECKING
+from sqlalchemy import BigInteger, DateTime, String, Text, Boolean, Enum as SQLEnum, Index, ForeignKey
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+if TYPE_CHECKING:
+    from typing import List
 
 
 def utc_now():
@@ -67,6 +71,10 @@ class User(Base):
         SQLEnum(ReminderTime), nullable=True
     )
 
+    # Relationships (для удобства ORM-запросов)
+    orders: Mapped["List[Order]"] = relationship(back_populates="user", lazy="selectin")
+    box_orders: Mapped["List[BoxOrder]"] = relationship(back_populates="user", lazy="selectin")
+
 
 class Order(Base):
     __tablename__ = "orders"
@@ -78,6 +86,10 @@ class Order(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    # Foreign key на User (nullable для обратной совместимости со старыми записями)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     name: Mapped[str] = mapped_column(String(255))
     phone: Mapped[str] = mapped_column(String(50))
     address: Mapped[str] = mapped_column(Text)
@@ -88,6 +100,9 @@ class Order(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationship к User
+    user: Mapped["User | None"] = relationship(back_populates="orders")
 
 
 class BoxOrder(Base):
@@ -101,6 +116,10 @@ class BoxOrder(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    # Foreign key на User (nullable для обратной совместимости со старыми записями)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -114,6 +133,9 @@ class BoxOrder(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     shipped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationship к User
+    user: Mapped["User | None"] = relationship(back_populates="box_orders")
 
 
 class Reminder(Base):

@@ -3,19 +3,24 @@ Middleware для бота.
 """
 import time
 import logging
-from collections import defaultdict
 from typing import Any, Awaitable, Callable, Dict
 
+from cachetools import TTLCache
 from aiogram import BaseMiddleware
 from aiogram.types import Message, CallbackQuery, TelegramObject
 
 logger = logging.getLogger(__name__)
+
+# Константы для rate limiting
+CACHE_MAX_SIZE = 10000  # Максимум пользователей в кэше
+CACHE_TTL = 600  # Время жизни записи в кэше (10 минут)
 
 
 class ThrottlingMiddleware(BaseMiddleware):
     """
     Rate limiting middleware.
     Ограничивает количество запросов от одного пользователя.
+    Использует TTLCache для автоматической очистки старых записей.
     """
 
     def __init__(
@@ -28,10 +33,8 @@ class ThrottlingMiddleware(BaseMiddleware):
         self.max_requests = max_requests
         self.window = window
 
-        # Хранилище: user_id -> {"last": timestamp, "count": int, "window_start": timestamp}
-        self._cache: Dict[int, Dict[str, float]] = defaultdict(
-            lambda: {"last": 0, "count": 0, "window_start": 0}
-        )
+        # TTLCache автоматически удаляет записи через CACHE_TTL секунд неактивности
+        self._cache: TTLCache = TTLCache(maxsize=CACHE_MAX_SIZE, ttl=CACHE_TTL)
 
     async def __call__(
         self,
@@ -45,11 +48,16 @@ class ThrottlingMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         now = time.time()
+
+        # TTLCache не поддерживает defaultdict, проверяем наличие ключа
+        if user_id not in self._cache:
+            self._cache[user_id] = {"last": 0, "count": 0, "window_start": 0}
+
         user_data = self._cache[user_id]
 
         # Проверка минимального интервала между запросами
         if now - user_data["last"] < self.rate_limit:
-            logger.debug(f"Rate limit hit for user {user_id} (too fast)")
+            logger.debug(f"Rate limit hit for user (too fast)")
             return await self._on_throttled(event, "too_fast")
 
         # Проверка количества запросов в окне
@@ -59,7 +67,7 @@ class ThrottlingMiddleware(BaseMiddleware):
             user_data["count"] = 0
 
         if user_data["count"] >= self.max_requests:
-            logger.warning(f"Rate limit exceeded for user {user_id} (max requests)")
+            logger.warning(f"Rate limit exceeded for user (max requests)")
             return await self._on_throttled(event, "max_requests")
 
         # Обновляем счётчики

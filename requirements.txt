@@ -6,3 +6,4 @@ asyncpg==0.30.0
 python-dotenv==1.0.1
 apscheduler==3.10.4
 httpx==0.28.1
+cachetools>=5.0.0

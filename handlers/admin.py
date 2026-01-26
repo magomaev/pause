@@ -3,7 +3,7 @@ from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramAPIError
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from datetime import datetime, timezone
 
 import texts
@@ -53,73 +53,65 @@ async def cmd_orders(message: Message, config: Config):
 
 @router.message(Command("stats"))
 async def cmd_stats(message: Message, config: Config):
-    """Статистика заказов и пользователей."""
+    """Статистика заказов и пользователей.
+
+    Оптимизировано: 3 запроса вместо 11 (используем CASE WHEN).
+    """
     if message.from_user.id != config.admin_id:
         return
 
     async with get_session() as session:
-        # Пользователи - эффективный COUNT
-        users_count_result = await session.execute(
+        # 1. Пользователи - один запрос
+        users_count = await session.scalar(
             select(func.count()).select_from(User)
-        )
-        users_count = users_count_result.scalar() or 0
+        ) or 0
 
-        # Общее количество заказов
-        total_result = await session.execute(
-            select(func.count()).select_from(Order)
+        # 2. Order статистика - один запрос с CASE WHEN
+        order_stats = await session.execute(
+            select(
+                func.count().label("total"),
+                func.sum(case((Order.status == OrderStatus.PENDING, 1), else_=0)).label("pending"),
+                func.sum(case((Order.status == OrderStatus.PAID, 1), else_=0)).label("paid"),
+                func.sum(case((Order.status == OrderStatus.CONFIRMED, 1), else_=0)).label("confirmed"),
+                func.coalesce(
+                    func.sum(case((Order.status == OrderStatus.CONFIRMED, Order.amount), else_=0)),
+                    0
+                ).label("revenue"),
+            )
         )
-        total_orders = total_result.scalar() or 0
+        order_row = order_stats.one()
+        total_orders = order_row.total or 0
+        pending = order_row.pending or 0
+        paid = order_row.paid or 0
+        confirmed = order_row.confirmed or 0
+        total_revenue = order_row.revenue or 0
 
-        # Заказы по статусам - эффективные запросы
-        pending_result = await session.execute(
-            select(func.count()).select_from(Order).where(Order.status == OrderStatus.PENDING)
+        # 3. BoxOrder статистика - один запрос с CASE WHEN
+        box_stats = await session.execute(
+            select(
+                func.count().label("total"),
+                func.sum(case((BoxOrder.status == BoxOrderStatus.PENDING, 1), else_=0)).label("pending"),
+                func.sum(case((BoxOrder.status == BoxOrderStatus.PAID, 1), else_=0)).label("paid"),
+                func.sum(case((BoxOrder.status == BoxOrderStatus.CONFIRMED, 1), else_=0)).label("confirmed"),
+                func.coalesce(
+                    func.sum(case(
+                        (BoxOrder.status.in_([
+                            BoxOrderStatus.CONFIRMED,
+                            BoxOrderStatus.SHIPPED,
+                            BoxOrderStatus.DELIVERED
+                        ]), BoxOrder.amount),
+                        else_=0
+                    )),
+                    0
+                ).label("revenue"),
+            )
         )
-        pending = pending_result.scalar() or 0
-
-        paid_result = await session.execute(
-            select(func.count()).select_from(Order).where(Order.status == OrderStatus.PAID)
-        )
-        paid = paid_result.scalar() or 0
-
-        confirmed_result = await session.execute(
-            select(func.count()).select_from(Order).where(Order.status == OrderStatus.CONFIRMED)
-        )
-        confirmed = confirmed_result.scalar() or 0
-
-        # Выручка Order - SUM с WHERE
-        revenue_result = await session.execute(
-            select(func.coalesce(func.sum(Order.amount), 0))
-            .where(Order.status == OrderStatus.CONFIRMED)
-        )
-        total_revenue = revenue_result.scalar() or 0
-
-        # === BoxOrder статистика ===
-        box_total_result = await session.execute(
-            select(func.count()).select_from(BoxOrder)
-        )
-        box_total = box_total_result.scalar() or 0
-
-        box_pending_result = await session.execute(
-            select(func.count()).select_from(BoxOrder).where(BoxOrder.status == BoxOrderStatus.PENDING)
-        )
-        box_pending = box_pending_result.scalar() or 0
-
-        box_paid_result = await session.execute(
-            select(func.count()).select_from(BoxOrder).where(BoxOrder.status == BoxOrderStatus.PAID)
-        )
-        box_paid = box_paid_result.scalar() or 0
-
-        box_confirmed_result = await session.execute(
-            select(func.count()).select_from(BoxOrder).where(BoxOrder.status == BoxOrderStatus.CONFIRMED)
-        )
-        box_confirmed = box_confirmed_result.scalar() or 0
-
-        # Выручка BoxOrder
-        box_revenue_result = await session.execute(
-            select(func.coalesce(func.sum(BoxOrder.amount), 0))
-            .where(BoxOrder.status.in_([BoxOrderStatus.CONFIRMED, BoxOrderStatus.SHIPPED, BoxOrderStatus.DELIVERED]))
-        )
-        box_revenue = box_revenue_result.scalar() or 0
+        box_row = box_stats.one()
+        box_total = box_row.total or 0
+        box_pending = box_row.pending or 0
+        box_paid = box_row.paid or 0
+        box_confirmed = box_row.confirmed or 0
+        box_revenue = box_row.revenue or 0
 
     text = f"""Статистика
 
