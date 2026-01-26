@@ -3,8 +3,10 @@
 """
 import logging
 
+from pathlib import Path
+
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -126,18 +128,29 @@ async def cmd_start(message: Message, state: FSMContext, config: Config):
         return
 
     # Иначе — начинаем онбординг
-    if config.welcome_photo_id:
-        await message.answer_photo(
-            photo=config.welcome_photo_id,
-            caption=texts.ONBOARDING_WELCOME,
-            reply_markup=keyboards.main_reply_keyboard()
-        )
-    else:
+    photo_sent = False
+    if config.welcome_photo_path:
+        photo_path = Path(config.welcome_photo_path)
+        if photo_path.exists():
+            try:
+                photo = FSInputFile(photo_path)
+                await message.answer_photo(
+                    photo=photo,
+                    caption=texts.ONBOARDING_WELCOME,
+                    reply_markup=keyboards.main_reply_keyboard()
+                )
+                photo_sent = True
+            except Exception as e:
+                logger.warning(f"Failed to send welcome photo: {e}")
+        else:
+            logger.warning(f"Welcome photo not found: {photo_path}")
+
+    if not photo_sent:
         await message.answer(
             texts.ONBOARDING_WELCOME,
             reply_markup=keyboards.main_reply_keyboard()
         )
-    logger.info(f"Sent ONBOARDING_WELCOME to {mask_user_for_log(message.from_user.id)}")
+    logger.info(f"Sent ONBOARDING_WELCOME to {mask_user_for_log(message.from_user.id)} (photo={photo_sent})")
 
     # Спрашиваем о напоминаниях
     await state.set_state(OnboardingForm.reminder_choice)

@@ -120,7 +120,7 @@ dp.include_router(menu_router)        # 6. ПОСЛЕДНИЙ — catch-all!
 ## 5. Паузы
 
 ### Типы контента
-- **Короткая пауза:** стихи (`pause_poems`) ↔ музыка (`pause_music`)
+- **Короткая пауза:** стихи (`pause_long`) ↔ музыка (`pause_music`)
 - **Длинная пауза:** медитация → фильм → книга (цикл)
 
 ### Циклическое чередование типов
@@ -308,19 +308,6 @@ class BoxOrder:
     created_at: datetime
     paid_at: datetime | None
     shipped_at: datetime | None
-```
-
-### Reminder
-```python
-class Reminder:
-    id: int
-    text: str | None
-    media_type: str | None            # photo / video / audio
-    media_file_id: str | None
-    scheduled_at: datetime
-    sent: bool
-    target: str                       # all / paid / telegram_id
-    created_at: datetime
 ```
 
 ### ContentCache / UITextCache

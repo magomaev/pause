@@ -1,11 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING
 from sqlalchemy import BigInteger, DateTime, String, Text, Boolean, Enum as SQLEnum, Index, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
-if TYPE_CHECKING:
-    from typing import List
 
 
 def utc_now():
@@ -72,8 +68,8 @@ class User(Base):
     )
 
     # Relationships (для удобства ORM-запросов)
-    orders: Mapped["List[Order]"] = relationship(back_populates="user", lazy="selectin")
-    box_orders: Mapped["List[BoxOrder]"] = relationship(back_populates="user", lazy="selectin")
+    orders: Mapped[list["Order"]] = relationship(back_populates="user", lazy="selectin")
+    box_orders: Mapped[list["BoxOrder"]] = relationship(back_populates="user", lazy="selectin")
 
 
 class Order(Base):
@@ -136,20 +132,6 @@ class BoxOrder(Base):
 
     # Relationship к User
     user: Mapped["User | None"] = relationship(back_populates="box_orders")
-
-
-class Reminder(Base):
-    """Напоминания для рассылки контента."""
-    __tablename__ = "reminders"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    media_type: Mapped[str | None] = mapped_column(String(50), nullable=True)  # photo, video, audio
-    media_file_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    sent: Mapped[bool] = mapped_column(Boolean, default=False)
-    target: Mapped[str] = mapped_column(String(50), default="all")  # all, paid, telegram_id
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # ===== КЭШИРОВАНИЕ КОНТЕНТА ИЗ NOTION =====

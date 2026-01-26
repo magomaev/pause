@@ -33,7 +33,7 @@ class Config(BaseSettings):
     notion_ui_texts_db: str = ""
 
     # Медиа
-    welcome_photo_id: str = ""
+    welcome_photo_path: str = ""  # Путь к локальному файлу (например, "assets/welcome.jpg")
 
     @field_validator("bot_token")
     @classmethod

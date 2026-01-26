@@ -77,6 +77,7 @@ async def main():
         BotCommand(command="book", description="Книга"),
         BotCommand(command="box", description="Новый набор"),
         BotCommand(command="settings", description="Настроить паузу"),
+        BotCommand(command="help", description="Помощь"),
         BotCommand(command="cancel", description="Отменить действие"),
     ])
 
