@@ -172,8 +172,25 @@ async def box_start(callback: CallbackQuery, state: FSMContext, config: Config):
     """
     month_key, month_display = get_box_month()
 
-    # Создаём заказ в БД сразу (без phone/address — заполним позже)
     async with get_session() as session:
+        # Проверяем нет ли уже активного заказа на этот месяц
+        existing = await session.execute(
+            select(BoxOrder).where(
+                BoxOrder.telegram_id == callback.from_user.id,
+                BoxOrder.box_month == month_key,
+                BoxOrder.status.in_([
+                    BoxOrderStatus.PENDING,
+                    BoxOrderStatus.PAID,
+                    BoxOrderStatus.CONFIRMED,
+                    BoxOrderStatus.SHIPPED,
+                ])
+            )
+        )
+        if existing.scalar_one_or_none():
+            await callback.answer("У тебя уже есть предзаказ на этот месяц")
+            return
+
+        # Создаём заказ в БД сразу (без phone/address — заполним позже)
         order = BoxOrder(
             telegram_id=callback.from_user.id,
             box_month=month_key,
@@ -319,6 +336,11 @@ async def confirm_box_order(callback: CallbackQuery, state: FSMContext, config: 
             await callback.answer("Заказ не найден")
             return
 
+        # Проверка что заказ принадлежит текущему пользователю
+        if order.telegram_id != callback.from_user.id:
+            await callback.answer("Это не ваш заказ")
+            return
+
         order.name = data["name"]
         order.phone = data["contact"]  # поле в БД называется phone
         order.address = data["address"]
@@ -371,7 +393,22 @@ async def box_later(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "box_cancel")
 async def box_cancel(callback: CallbackQuery, state: FSMContext):
     """Отмена заказа набора."""
+    # Получаем order_id до очистки state
+    data = await state.get_data()
+    order_id = data.get("order_id")
+
     await state.clear()
+
+    # Отменяем заказ в БД если он был создан
+    if order_id:
+        async with get_session() as session:
+            result = await session.execute(
+                select(BoxOrder).where(BoxOrder.id == order_id)
+            )
+            order = result.scalar_one_or_none()
+            if order and order.status == BoxOrderStatus.PENDING:
+                order.status = BoxOrderStatus.CANCELLED
+                await session.commit()
 
     _, month_display = get_box_month()
 

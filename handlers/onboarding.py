@@ -2,9 +2,10 @@
 Онбординг пользователя — настройка напоминаний.
 """
 import logging
+
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import TelegramAPIError
@@ -12,6 +13,7 @@ from sqlalchemy import select
 
 import texts
 import keyboards
+from config import Config
 from database import get_session, User, ReminderFrequency, ReminderTime
 
 router = Router()
@@ -73,7 +75,7 @@ async def update_user_settings(
 # ===== ЭКРАН 0: ПРИВЕТСТВИЕ =====
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext):
+async def cmd_start(message: Message, state: FSMContext, config: Config):
     """Команда /start — начало онбординга."""
     logger.info(f"/start from user {message.from_user.id} (@{message.from_user.username})")
 
@@ -97,12 +99,26 @@ async def cmd_start(message: Message, state: FSMContext):
         logger.info(f"Sent WELCOME_BACK to user {message.from_user.id}")
         return
 
-    # Иначе — начинаем онбординг (сразу даём клавиатуру)
-    await message.answer(
-        texts.ONBOARDING_WELCOME,
-        reply_markup=keyboards.main_reply_keyboard()
-    )
+    # Иначе — начинаем онбординг
+    if config.welcome_photo_id:
+        await message.answer_photo(
+            photo=config.welcome_photo_id,
+            caption=texts.ONBOARDING_WELCOME,
+            reply_markup=keyboards.main_reply_keyboard()
+        )
+    else:
+        await message.answer(
+            texts.ONBOARDING_WELCOME,
+            reply_markup=keyboards.main_reply_keyboard()
+        )
     logger.info(f"Sent ONBOARDING_WELCOME to user {message.from_user.id}")
+
+    # Спрашиваем о напоминаниях
+    await state.set_state(OnboardingForm.reminder_choice)
+    await message.answer(
+        texts.ONBOARDING_ASK_REMINDERS,
+        reply_markup=keyboards.onboarding_reminders()
+    )
 
 
 # ===== ЭКРАН 1: НУЖНЫ ЛИ НАПОМИНАНИЯ =====
@@ -280,9 +296,40 @@ async def select_time(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+# ===== ПОЛУЧИТЬ FILE_ID ФОТО =====
+
+@router.message(F.photo)
+async def get_photo_file_id(message: Message):
+    """Получить file_id фото (для настройки welcome photo)."""
+    file_id = message.photo[-1].file_id
+    await message.reply(f"`{file_id}`", parse_mode="Markdown")
+
+
 # ===== КОМАНДА /help =====
 
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     """Команда /help."""
     await message.answer(texts.HELP)
+
+
+# ===== КОМАНДА /cancel =====
+
+@router.message(Command("cancel"), StateFilter("*"))
+async def cmd_cancel(message: Message, state: FSMContext):
+    """Команда /cancel — выход из любого FSM состояния."""
+    current_state = await state.get_state()
+
+    if current_state is None:
+        await message.answer(
+            "Нет активного действия для отмены.",
+            reply_markup=keyboards.main_reply_keyboard()
+        )
+        return
+
+    logger.info(f"User {message.from_user.id} cancelled state {current_state}")
+    await state.clear()
+    await message.answer(
+        "Действие отменено.",
+        reply_markup=keyboards.main_reply_keyboard()
+    )

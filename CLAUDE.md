@@ -1,45 +1,83 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## ПЕРЕД ИЗМЕНЕНИЯМИ — ЧИТАЙ FEATURES.md
 
-## Project Overview
+**Полное описание функционала:** см. `FEATURES.md`
 
-Telegram bot for selling "Пауза" (Pause) — a product offering short mental break content. Built with aiogram 3.x (async Python Telegram framework) and SQLAlchemy 2.x async ORM.
+### Правила для агента:
+1. **НЕ удалять фичи** без явного запроса пользователя
+2. **НЕ менять логику** существующих фич без необходимости
+3. **НЕ менять порядок роутеров** — menu_router ВСЕГДА последний
+4. При изменении — проверить, что не сломались другие фичи
 
-## Commands
+---
+
+## Описание проекта
+
+Telegram бот для продажи "Пауза" — продукт с контентом для ментальных пауз. Построен на aiogram 3.x и SQLAlchemy 2.x async.
+
+## Команды
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Run the bot
 python main.py
 ```
 
-Required environment variables: `BOT_TOKEN`, `ADMIN_ID`, `PAYMENT_LINK`
+## Переменные окружения
 
-## Architecture
+Обязательные: `BOT_TOKEN`, `ADMIN_ID`, `PAYMENT_LINK`
 
-**Entry point**: `main.py` — initializes database, creates Bot/Dispatcher, registers routers
+Опциональные: `DATABASE_URL`, `NOTION_TOKEN`, `NOTION_CONTENT_DB`, `NOTION_UI_TEXTS_DB`
 
-**Configuration**: `config.py` — dataclass-based config loaded from environment variables
+## Архитектура
 
-**Handlers** (aiogram Router pattern):
-- `handlers/base.py` — user commands (`/start`, `/about`, `/help`) and navigation callbacks
-- `handlers/orders.py` — order flow using FSM (Finite State Machine) with `OrderForm` states
-- `handlers/admin.py` — admin commands (`/orders`, `/stats`) and order confirmation callbacks
+```
+pause/
+├── main.py              # Точка входа
+├── config.py            # Конфигурация
+├── texts.py             # Тексты сообщений
+├── keyboards.py         # Клавиатуры
+├── content.py           # ContentManager (singleton)
+├── middleware.py        # Rate limiting middleware
+├── scheduler.py         # Планировщик напоминаний
+├── handlers/
+│   ├── onboarding.py    # /start, /help, онбординг
+│   ├── pause.py         # /pause
+│   ├── box.py           # Предзаказ набора
+│   ├── orders.py        # Заказы
+│   ├── admin.py         # Админ команды
+│   └── menu.py          # Reply keyboard + catch-all
+└── database/
+    ├── connection.py
+    └── models.py
+```
 
-**Database** (async SQLAlchemy):
-- `database/connection.py` — engine and session factory (currently hardcoded to SQLite)
-- `database/models.py` — `User`, `Order` (with `OrderStatus` enum), `Reminder` models
+## Порядок роутеров (КРИТИЧНО!)
 
-**UI**:
-- `texts.py` — all bot messages (Russian)
-- `keyboards.py` — inline keyboard builders using `InlineKeyboardBuilder`
+```python
+dp.include_router(onboarding_router)  # 1
+dp.include_router(pause_router)       # 2
+dp.include_router(box_router)         # 3
+dp.include_router(orders_router)      # 4
+dp.include_router(admin_router)       # 5
+dp.include_router(menu_router)        # 6 — ПОСЛЕДНИЙ!
+```
 
-## Key Patterns
+**menu_router содержит catch-all** — если поставить раньше, перехватит все сообщения.
 
-- Config is passed to handlers via `dp["config"] = config` and received as `config: Config` parameter
-- All database operations use async context manager: `async with get_session() as session:`
-- Order flow uses aiogram FSM: states defined in `OrderForm(StatesGroup)`, transitions via `state.set_state()`
-- Admin callbacks use prefix pattern: `confirm_{order_id}`, `reject_{order_id}`
+## Ключевые паттерны
+
+- Config через `dp["config"]`, получается как `config: Config` в handlers
+- Async sessions: `async with get_session() as session:`
+- FSM для многошаговых процессов (онбординг, заказы)
+- Admin callbacks: `confirm_{id}`, `reject_{id}`, `box_confirm_{id}`, `box_reject_{id}`
+- Циклическое чередование контента через `last_pause_type` в FSM state
+
+## Основные фичи (см. FEATURES.md)
+
+- Онбординг с настройкой напоминаний
+- Короткие паузы (стихи/музыка с чередованием)
+- Длинные паузы (медитация/фильм/книга с чередованием)
+- Предзаказ физического набора (BoxOrder)
+- Заказы цифрового продукта (Order)
+- Админ: подтверждение заказов, статистика, синхронизация с Notion

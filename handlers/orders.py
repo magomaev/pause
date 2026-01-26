@@ -83,12 +83,13 @@ async def start_order(callback: CallbackQuery, state: FSMContext):
     await state.clear()  # Очищаем предыдущее состояние
     await state.set_state(OrderForm.name)
 
+    # Редактируем предыдущее сообщение, убирая кнопки
     try:
-        await callback.message.edit_text(texts.ORDER_START)
+        await callback.message.edit_reply_markup(reply_markup=None)
     except TelegramAPIError:
         pass
 
-    # Скрываем reply keyboard на время ввода данных
+    # Отправляем новое сообщение
     await callback.message.answer(texts.ORDER_START, reply_markup=keyboards.remove_reply_keyboard())
 
     await callback.answer()

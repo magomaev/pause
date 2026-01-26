@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import signal
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
@@ -17,6 +18,7 @@ from handlers import (
 )
 from scheduler import create_scheduler
 from content import ContentManager
+from middleware import ThrottlingMiddleware
 
 
 async def main():
@@ -53,6 +55,10 @@ async def main():
     # Передаём config во все хэндлеры
     dp["config"] = config
 
+    # Подключаем middleware
+    dp.message.middleware(ThrottlingMiddleware())
+    dp.callback_query.middleware(ThrottlingMiddleware())
+
     # Регистрируем роутеры (порядок важен!)
     # 1. Команды и FSM — сначала, чтобы они имели приоритет
     dp.include_router(onboarding_router)  # /start, /help, онбординг FSM
@@ -71,20 +77,51 @@ async def main():
         BotCommand(command="book", description="Книга"),
         BotCommand(command="box", description="Новый набор"),
         BotCommand(command="settings", description="Настроить паузу"),
+        BotCommand(command="cancel", description="Отменить действие"),
     ])
 
     # Создаём и запускаем планировщик напоминаний
     pause_scheduler = create_scheduler(bot)
     pause_scheduler.start()
 
+    # Обработка сигналов для graceful shutdown
+    shutdown_event = asyncio.Event()
+
+    def signal_handler():
+        logging.info("Получен сигнал завершения, останавливаем...")
+        shutdown_event.set()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            loop.add_signal_handler(sig, signal_handler)
+        except NotImplementedError:
+            # Windows не поддерживает add_signal_handler
+            pass
+
     # Запускаем
     logging.info("Бот запущен")
 
+    async def shutdown():
+        """Graceful shutdown."""
+        await shutdown_event.wait()
+        logging.info("Начинаем graceful shutdown...")
+
+        # Останавливаем polling
+        await dp.stop_polling()
+
     try:
-        await dp.start_polling(bot)
+        # Запускаем polling и ждём сигнала завершения
+        await asyncio.gather(
+            dp.start_polling(bot),
+            shutdown(),
+            return_exceptions=True
+        )
     finally:
         # Cleanup
+        logging.info("Останавливаем планировщик...")
         pause_scheduler.stop()
+        logging.info("Закрываем соединение с БД...")
         await close_db()
         logging.info("Бот остановлен")
 

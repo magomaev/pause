@@ -86,23 +86,58 @@ async def cmd_stats(message: Message, config: Config):
         )
         confirmed = confirmed_result.scalar() or 0
 
-        # Выручка - SUM с WHERE
+        # Выручка Order - SUM с WHERE
         revenue_result = await session.execute(
             select(func.coalesce(func.sum(Order.amount), 0))
             .where(Order.status == OrderStatus.CONFIRMED)
         )
         total_revenue = revenue_result.scalar() or 0
 
+        # === BoxOrder статистика ===
+        box_total_result = await session.execute(
+            select(func.count()).select_from(BoxOrder)
+        )
+        box_total = box_total_result.scalar() or 0
+
+        box_pending_result = await session.execute(
+            select(func.count()).select_from(BoxOrder).where(BoxOrder.status == BoxOrderStatus.PENDING)
+        )
+        box_pending = box_pending_result.scalar() or 0
+
+        box_paid_result = await session.execute(
+            select(func.count()).select_from(BoxOrder).where(BoxOrder.status == BoxOrderStatus.PAID)
+        )
+        box_paid = box_paid_result.scalar() or 0
+
+        box_confirmed_result = await session.execute(
+            select(func.count()).select_from(BoxOrder).where(BoxOrder.status == BoxOrderStatus.CONFIRMED)
+        )
+        box_confirmed = box_confirmed_result.scalar() or 0
+
+        # Выручка BoxOrder
+        box_revenue_result = await session.execute(
+            select(func.coalesce(func.sum(BoxOrder.amount), 0))
+            .where(BoxOrder.status.in_([BoxOrderStatus.CONFIRMED, BoxOrderStatus.SHIPPED, BoxOrderStatus.DELIVERED]))
+        )
+        box_revenue = box_revenue_result.scalar() or 0
+
     text = f"""Статистика
 
 Пользователей: {users_count}
-Заказов всего: {total_orders}
 
+--- Заказы ---
+Всего: {total_orders}
 ⏳ Ожидают оплаты: {pending}
 💰 Оплачено (не подтв.): {paid}
 ✅ Подтверждено: {confirmed}
+Выручка: {total_revenue} €
 
-Выручка: {total_revenue} €"""
+--- Предзаказы набора ---
+Всего: {box_total}
+⏳ Ожидают оплаты: {box_pending}
+💰 Оплачено (не подтв.): {box_paid}
+✅ Подтверждено: {box_confirmed}
+Выручка: {box_revenue} €"""
 
     await message.answer(text)
 
@@ -406,10 +441,3 @@ UI тексты: {result['ui_texts']} записей"""
         await status_msg.edit_text(f"Ошибка синхронизации:\n{e}")
 
 
-# ===== УТИЛИТЫ =====
-
-@router.message(F.photo)
-async def get_photo_file_id(message: Message):
-    """Получить file_id фото."""
-    file_id = message.photo[-1].file_id
-    await message.reply(f"`{file_id}`", parse_mode="Markdown")

@@ -37,11 +37,17 @@ async def init_db(database_url: str | None = None):
     elif database_url.startswith("postgresql://") and "+asyncpg" not in database_url:
         database_url = database_url.replace("postgresql://", "postgresql+asyncpg://")
 
-    engine = create_async_engine(
-        database_url,
-        echo=False,
-        pool_pre_ping=True,  # Проверка соединения перед использованием
-    )
+    # Настройки пула зависят от типа БД
+    is_sqlite = "sqlite" in database_url
+    engine_kwargs = {
+        "echo": False,
+    }
+
+    if not is_sqlite:
+        # pool_pre_ping не поддерживается для SQLite (NullPool)
+        engine_kwargs["pool_pre_ping"] = True
+
+    engine = create_async_engine(database_url, **engine_kwargs)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
 
     async with engine.begin() as conn:

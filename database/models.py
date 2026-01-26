@@ -96,6 +96,7 @@ class BoxOrder(Base):
     __table_args__ = (
         Index("ix_box_orders_status", "status"),
         Index("ix_box_orders_box_month", "box_month"),
+        Index("ix_box_orders_telegram_status", "telegram_id", "status"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

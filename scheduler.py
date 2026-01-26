@@ -1,6 +1,7 @@
 """
 Планировщик напоминаний — автоматическая отправка пауз.
 """
+import asyncio
 import random
 import logging
 from datetime import datetime, timezone
@@ -61,22 +62,38 @@ class PauseScheduler:
 
         logger.debug(f"Checking pauses at {now}, hour={current_hour}, weekday={current_weekday}")
 
-        # Получаем пользователей с включёнными напоминаниями
-        async with get_session() as session:
-            result = await session.execute(
-                select(User).where(
-                    User.reminder_enabled == True,  # noqa: E712
-                    User.onboarding_completed == True  # noqa: E712
-                )
-            )
-            users = result.scalars().all()
-
         sent_count = 0
-        for user in users:
-            if self._should_send_to_user(user, current_hour, current_weekday):
-                success = await self._send_pause(user.telegram_id)
-                if success:
-                    sent_count += 1
+        batch_size = 100  # Обрабатываем по 100 пользователей за раз
+
+        # Используем пагинацию для экономии памяти
+        offset = 0
+        while True:
+            async with get_session() as session:
+                result = await session.execute(
+                    select(User)
+                    .where(
+                        User.reminder_enabled == True,  # noqa: E712
+                        User.onboarding_completed == True  # noqa: E712
+                    )
+                    .offset(offset)
+                    .limit(batch_size)
+                )
+                users = result.scalars().all()
+
+                if not users:
+                    break  # Больше нет пользователей
+
+                for user in users:
+                    if self._should_send_to_user(user, current_hour, current_weekday):
+                        success = await self._send_pause(user.telegram_id)
+                        if success:
+                            sent_count += 1
+
+                offset += batch_size
+
+                # Небольшая пауза между батчами чтобы не перегружать Telegram API
+                if len(users) == batch_size:
+                    await asyncio.sleep(0.1)
 
         if sent_count > 0:
             logger.info(f"Sent {sent_count} pause reminders at hour {current_hour}")
@@ -111,10 +128,10 @@ class PauseScheduler:
 
         if user.reminder_time == ReminderTime.RANDOM:
             # Для случайного времени — отправляем в случайный час из диапазона
-            # Используем telegram_id как seed для консистентности в пределах дня
-            random.seed(user.telegram_id + current_weekday * 100 + datetime.now(timezone.utc).day)
-            target_hour = random.randint(start_hour, end_hour - 1)
-            random.seed()  # Сбрасываем seed
+            # Используем изолированный генератор с seed для консистентности в пределах дня
+            seed = user.telegram_id + current_weekday * 100 + datetime.now(timezone.utc).day
+            rng = random.Random(seed)
+            target_hour = rng.randint(start_hour, end_hour - 1)
 
             return current_hour == target_hour
         else:

@@ -1,35 +1,51 @@
-import os
-from dataclasses import dataclass
-from dotenv import load_dotenv
-
-load_dotenv()
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-@dataclass
-class Config:
-    bot_token: str
-    admin_id: int
-    database_url: str
-    payment_link: str  # Revolut Payment Link
+class Config(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # Обязательные
+    bot_token: str = Field(..., min_length=1)
+    admin_id: int = Field(..., gt=0)
+    payment_link: str = Field(..., min_length=1)
+
+    # База данных
+    database_url: str = "sqlite+aiosqlite:///pause.db"
 
     # Продукт
     product_name: str = "Пауза"
-    product_price: int = 79
+    product_price: int = Field(default=79, gt=0)
     product_currency: str = "EUR"
 
-    # Notion
+    # Notion (опциональные)
     notion_token: str = ""
-    notion_content_db: str = ""  # ID базы контента
-    notion_ui_texts_db: str = ""  # ID базы UI текстов
+    notion_content_db: str = ""
+    notion_ui_texts_db: str = ""
+
+    # Медиа
+    welcome_photo_id: str = ""
+
+    @field_validator("bot_token")
+    @classmethod
+    def validate_bot_token(cls, v: str) -> str:
+        if not v or v == "":
+            raise ValueError("BOT_TOKEN is required")
+        if ":" not in v:
+            raise ValueError("BOT_TOKEN format invalid (expected 'id:hash')")
+        return v
+
+    @field_validator("payment_link")
+    @classmethod
+    def validate_payment_link(cls, v: str) -> str:
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("PAYMENT_LINK must be a valid URL")
+        return v
 
 
 def load_config() -> Config:
-    return Config(
-        bot_token=os.getenv("BOT_TOKEN", ""),
-        admin_id=int(os.getenv("ADMIN_ID", "0")),
-        database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///bot.db"),
-        payment_link=os.getenv("PAYMENT_LINK", "https://checkout.revolut.com/pay/2406b670-be55-4a88-a3ac-9605998a942d"),
-        notion_token=os.getenv("NOTION_TOKEN", ""),
-        notion_content_db=os.getenv("NOTION_CONTENT_DB", ""),
-        notion_ui_texts_db=os.getenv("NOTION_UI_TEXTS_DB", ""),
-    )
+    return Config()
