@@ -115,17 +115,23 @@ async def admin_confirm_order(callback: CallbackQuery, bot: Bot, config: Config)
         await callback.answer("Нет доступа")
         return
 
-    # Безопасный парсинг order_id
+    # Строгий парсинг order_id: ожидаем ровно "confirm_123"
+    parts = callback.data.split("_")
+    if len(parts) != 2:
+        logger.warning(f"Invalid callback format: {callback.data[:50]}")
+        await callback.answer("Ошибка данных")
+        return
     try:
-        order_id = int(callback.data.split("_")[1])
-    except (ValueError, IndexError):
-        logger.error(f"Invalid callback data: {callback.data}")
+        order_id = int(parts[1])
+    except ValueError:
+        logger.warning(f"Invalid order_id in callback: {callback.data[:50]}")
         await callback.answer("Ошибка данных")
         return
 
     async with get_session() as session:
+        # Row-level lock для предотвращения race condition
         result = await session.execute(
-            select(Order).where(Order.id == order_id)
+            select(Order).where(Order.id == order_id).with_for_update()
         )
         order = result.scalar_one_or_none()
 
@@ -135,7 +141,7 @@ async def admin_confirm_order(callback: CallbackQuery, bot: Bot, config: Config)
 
         # Проверка что заказ ещё не обработан
         if order.status not in (OrderStatus.PENDING, OrderStatus.PAID):
-            await callback.answer(f"Заказ уже {order.status.value}")
+            await callback.answer("Заказ уже обработан")
             return
 
         order.status = OrderStatus.CONFIRMED
@@ -169,17 +175,23 @@ async def admin_reject_order(callback: CallbackQuery, bot: Bot, config: Config):
         await callback.answer("Нет доступа")
         return
 
-    # Безопасный парсинг order_id
+    # Строгий парсинг order_id: ожидаем ровно "reject_123"
+    parts = callback.data.split("_")
+    if len(parts) != 2:
+        logger.warning(f"Invalid callback format: {callback.data[:50]}")
+        await callback.answer("Ошибка данных")
+        return
     try:
-        order_id = int(callback.data.split("_")[1])
-    except (ValueError, IndexError):
-        logger.error(f"Invalid callback data: {callback.data}")
+        order_id = int(parts[1])
+    except ValueError:
+        logger.warning(f"Invalid order_id in callback: {callback.data[:50]}")
         await callback.answer("Ошибка данных")
         return
 
     async with get_session() as session:
+        # Row-level lock для предотвращения race condition
         result = await session.execute(
-            select(Order).where(Order.id == order_id)
+            select(Order).where(Order.id == order_id).with_for_update()
         )
         order = result.scalar_one_or_none()
 
@@ -226,17 +238,23 @@ async def admin_confirm_box_order(callback: CallbackQuery, bot: Bot, config: Con
         await callback.answer("Нет доступа")
         return
 
-    # Безопасный парсинг order_id
+    # Строгий парсинг order_id: ожидаем ровно "box_confirm_123"
+    parts = callback.data.split("_")
+    if len(parts) != 3:
+        logger.warning(f"Invalid callback format: {callback.data[:50]}")
+        await callback.answer("Ошибка данных")
+        return
     try:
-        order_id = int(callback.data.split("_")[2])
-    except (ValueError, IndexError):
-        logger.error(f"Invalid callback data: {callback.data}")
+        order_id = int(parts[2])
+    except ValueError:
+        logger.warning(f"Invalid order_id in callback: {callback.data[:50]}")
         await callback.answer("Ошибка данных")
         return
 
     async with get_session() as session:
+        # Row-level lock для предотвращения race condition
         result = await session.execute(
-            select(BoxOrder).where(BoxOrder.id == order_id)
+            select(BoxOrder).where(BoxOrder.id == order_id).with_for_update()
         )
         order = result.scalar_one_or_none()
 
@@ -246,7 +264,7 @@ async def admin_confirm_box_order(callback: CallbackQuery, bot: Bot, config: Con
 
         # Проверка что заказ ещё не обработан
         if order.status not in (BoxOrderStatus.PENDING, BoxOrderStatus.PAID):
-            await callback.answer(f"Заказ уже {order.status.value}")
+            await callback.answer("Заказ уже обработан")
             return
 
         order.status = BoxOrderStatus.CONFIRMED
@@ -254,9 +272,14 @@ async def admin_confirm_box_order(callback: CallbackQuery, bot: Bot, config: Con
 
         # Уведомляем пользователя
         try:
-            month_display = texts.MONTHS_GENITIVE.get(
-                int(order.box_month.split("-")[1]), order.box_month
-            )
+            # Безопасный парсинг box_month (формат YYYY-MM)
+            month_num = 0
+            if order.box_month and len(order.box_month) >= 7:
+                try:
+                    month_num = int(order.box_month[5:7])
+                except ValueError:
+                    pass
+            month_display = texts.MONTHS_GENITIVE.get(month_num, order.box_month or "—")
             await bot.send_message(
                 order.telegram_id,
                 texts.BOX_CONFIRMED.format(month=month_display)
@@ -282,17 +305,23 @@ async def admin_reject_box_order(callback: CallbackQuery, bot: Bot, config: Conf
         await callback.answer("Нет доступа")
         return
 
-    # Безопасный парсинг order_id
+    # Строгий парсинг order_id: ожидаем ровно "box_reject_123"
+    parts = callback.data.split("_")
+    if len(parts) != 3:
+        logger.warning(f"Invalid callback format: {callback.data[:50]}")
+        await callback.answer("Ошибка данных")
+        return
     try:
-        order_id = int(callback.data.split("_")[2])
-    except (ValueError, IndexError):
-        logger.error(f"Invalid callback data: {callback.data}")
+        order_id = int(parts[2])
+    except ValueError:
+        logger.warning(f"Invalid order_id in callback: {callback.data[:50]}")
         await callback.answer("Ошибка данных")
         return
 
     async with get_session() as session:
+        # Row-level lock для предотвращения race condition
         result = await session.execute(
-            select(BoxOrder).where(BoxOrder.id == order_id)
+            select(BoxOrder).where(BoxOrder.id == order_id).with_for_update()
         )
         order = result.scalar_one_or_none()
 
@@ -375,3 +404,12 @@ UI тексты: {result['ui_texts']} записей"""
     except Exception as e:
         logger.exception("Sync failed")
         await status_msg.edit_text(f"Ошибка синхронизации:\n{e}")
+
+
+# ===== УТИЛИТЫ =====
+
+@router.message(F.photo)
+async def get_photo_file_id(message: Message):
+    """Получить file_id фото."""
+    file_id = message.photo[-1].file_id
+    await message.reply(f"`{file_id}`", parse_mode="Markdown")

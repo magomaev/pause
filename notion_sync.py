@@ -104,8 +104,8 @@ class NotionSyncService:
             )
 
             if response.status_code != 200:
-                error_text = response.text
-                logger.error(f"Notion API error: {response.status_code} - {error_text}")
+                # Не логируем полный response body — может содержать sensitive data
+                logger.error(f"Notion API error: {response.status_code}")
                 raise Exception(f"Notion API error: {response.status_code}")
 
             data = response.json()

@@ -135,7 +135,9 @@ async def catch_all_text(message: Message):
     Обработка необработанных текстовых сообщений.
     Показывает reply keyboard если пользователь написал что-то непонятное.
     """
-    logger.info(f"Unhandled text from user {message.from_user.id}: {message.text!r}")
+    # Truncate user text для защиты от log injection/overflow
+    safe_text = (message.text or "")[:100]
+    logger.info(f"Unhandled text from user {message.from_user.id}: {safe_text!r}")
     # Просто показываем клавиатуру без лишних сообщений
     await message.answer(
         "Нажми кнопку внизу.",

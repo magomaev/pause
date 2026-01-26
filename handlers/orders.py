@@ -233,16 +233,18 @@ async def user_paid(callback: CallbackQuery, bot: Bot, config: Config):
     order_contact = None
 
     async with get_session() as session:
+        # Row-level lock для предотвращения race condition
         result = await session.execute(
             select(Order)
             .where(Order.telegram_id == callback.from_user.id)
             .where(Order.status == OrderStatus.PENDING)
             .order_by(Order.created_at.desc())
+            .with_for_update()
         )
         order = result.scalar_one_or_none()
 
         if order:
-            # Проверяем статус ещё раз (защита от race condition)
+            # Двойная проверка статуса после получения lock
             if order.status != OrderStatus.PENDING:
                 await callback.answer("Заказ уже обработан")
                 return

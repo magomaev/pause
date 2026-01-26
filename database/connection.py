@@ -1,9 +1,21 @@
 import logging
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from database.models import Base
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_db_url_for_log(url: str) -> str:
+    """Безопасно извлечь хост из URL для логирования (без credentials)."""
+    try:
+        parsed = urlparse(url)
+        if parsed.hostname:
+            return f"{parsed.scheme}://***@{parsed.hostname}{parsed.path or ''}"
+        return url.split("://")[0] + "://***"
+    except Exception:
+        return "***"
 
 engine = None
 async_session = None
@@ -35,7 +47,7 @@ async def init_db(database_url: str | None = None):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    logger.info(f"Database initialized: {database_url.split('@')[-1] if '@' in database_url else database_url}")
+    logger.info(f"Database initialized: {_sanitize_db_url_for_log(database_url)}")
 
 
 async def close_db():

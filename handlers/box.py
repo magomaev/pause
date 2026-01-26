@@ -391,16 +391,18 @@ async def box_user_paid(callback: CallbackQuery, bot: Bot, config: Config):
     _, month_display = get_box_month()
 
     async with get_session() as session:
+        # Row-level lock для предотвращения race condition
         result = await session.execute(
             select(BoxOrder)
             .where(BoxOrder.telegram_id == callback.from_user.id)
             .where(BoxOrder.status == BoxOrderStatus.PENDING)
             .order_by(BoxOrder.created_at.desc())
+            .with_for_update()
         )
         order = result.scalar_one_or_none()
 
         if order:
-            # Проверяем статус ещё раз (защита от race condition)
+            # Двойная проверка статуса после получения lock
             if order.status != BoxOrderStatus.PENDING:
                 await callback.answer("Заказ уже обработан")
                 return
