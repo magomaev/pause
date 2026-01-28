@@ -195,17 +195,11 @@ async def reminders_no(callback: CallbackQuery, state: FSMContext):
         reminder_enabled=False
     )
 
-    # Редактируем текст предыдущего сообщения (затираем первое вторым)
+    # Редактируем сообщение с вопросом на финальный текст
     try:
         await callback.message.edit_text(texts.ONBOARDING_NO_REMINDERS)
     except TelegramAPIError:
         await callback.message.answer(texts.ONBOARDING_NO_REMINDERS)
-
-    # Reply Keyboard отправляем отдельным сообщением
-    await callback.message.answer(
-        "⁣",  # невидимый символ для показа Reply Keyboard
-        reply_markup=keyboards.main_reply_keyboard()
-    )
 
     await callback.answer()
 
@@ -320,17 +314,11 @@ async def select_time(callback: CallbackQuery, state: FSMContext):
         time_text=time_text_map.get(reminder_time, "")
     )
 
-    # Убираем кнопки с предыдущего сообщения
+    # Редактируем сообщение на финальный текст подтверждения
     try:
-        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.message.edit_text(confirm_text)
     except TelegramAPIError:
-        pass
-
-    # Завершённое действие — отправляем новым сообщением с reply keyboard
-    await callback.message.answer(
-        confirm_text,
-        reply_markup=keyboards.main_reply_keyboard()
-    )
+        await callback.message.answer(confirm_text)
 
     await callback.answer()
 
