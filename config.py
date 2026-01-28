@@ -20,7 +20,7 @@ class Config(BaseSettings):
     payment_link: str = Field(..., min_length=1)
 
     # База данных
-    database_url: str = "sqlite+aiosqlite:///pause.db"
+    database_url: str = "sqlite+aiosqlite:///bot.db"
 
     # Продукт
     product_name: str = "Пауза"
